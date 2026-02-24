@@ -73,6 +73,7 @@ class WikiManagerFactory {
 		private readonly UserFactory $userFactory,
 		private readonly MessageLocalizer $messageLocalizer,
 		private readonly ServiceOptions $options,
+        private readonly JobQueueGroup $jobQueueGroup,
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 	}
@@ -278,7 +279,7 @@ class WikiManagerFactory {
             $this->cwdb
         );
 
-        JobQueueGroup::singleton()->push( $job );
+        $this->jobQueueGroup->push( $job );
 
 		if ( $actor !== '' ) {
 			$notificationData = [
