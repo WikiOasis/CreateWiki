@@ -47,8 +47,7 @@
             "class": "Miraheze\\CreateWiki\\Jobs\\PostCreateWikiJob",
             "services": [
                 "ExtensionRegistry",
-                "CreateWikiHookRunner",
-                "DBLoadBalancerFactory"
+                "CreateWikiHookRunner"
             ],
             "needsPage": false
         },
