@@ -38,12 +38,10 @@ class PostCreateWikiJob extends Job {
                 [ '--wiki', $this->dbname ]
             )->limits( $limits )->execute();
 
-            if ( !defined( 'MW_PHPUNIT_TEST' ) ) {
-                Shell::makeScriptCommand(
-                    'PopulateMainPage',
-                    [ '--wiki', $this->dbname ]
-                )->limits( $limits )->execute();
-            }
+            Shell::makeScriptCommand(
+                'PopulateMainPage',
+                [ '--wiki', $this->dbname ]
+            )->limits( $limits )->execute();
 
             if ( $this->extensionRegistry->isLoaded( 'CentralAuth' ) ) {
                 Shell::makeScriptCommand(
