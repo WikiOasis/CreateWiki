@@ -8,6 +8,7 @@ use MediaWiki\Config\ConfigException;
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Deferred\DeferredUpdates;
 use MediaWiki\Exception\FatalError;
+use MediaWiki\JobQueue\JobQueueGroup;
 use MediaWiki\Logging\ManualLogEntry;
 use MediaWiki\MainConfigNames;
 use MediaWiki\Registration\ExtensionRegistry;
@@ -18,6 +19,7 @@ use MessageLocalizer;
 use Miraheze\CreateWiki\ConfigNames;
 use Miraheze\CreateWiki\Exceptions\MissingWikiError;
 use Miraheze\CreateWiki\Hooks\CreateWikiHookRunner;
+use Miraheze\CreateWiki\Jobs\PostCreateWikiJob;
 use Miraheze\CreateWiki\Maintenance\PopulateMainPage;
 use Miraheze\CreateWiki\Maintenance\SetContainersAccess;
 use Wikimedia\Rdbms\DBConnRef;
@@ -249,66 +251,34 @@ class WikiManagerFactory {
 		return null;
 	}
 
-	private function doAfterCreate(
-		string $sitename,
-		bool $private,
-		string $requester,
-		string $actor,
-		string $reason,
-		array $extra
-	): void {
-		foreach ( $this->options->get( ConfigNames::SQLFiles ) as $sqlfile ) {
-			$this->dbw->sourceFile( $sqlfile, fname: __METHOD__ );
-		}
+    private function doAfterCreate(
+        string $sitename,
+        bool $private,
+        string $requester,
+        string $actor,
+        string $reason,
+        array $extra
+    ): void {
+        foreach ( $this->options->get( ConfigNames::SQLFiles ) as $sqlfile ) {
+            $this->dbw->sourceFile( $sqlfile, fname: __METHOD__ );
+        }
 
-		$this->hookRunner->onCreateWikiCreation( $this->dbname, $private );
+        $this->hookRunner->onCreateWikiCreation( $this->dbname, $private );
 
-		DeferredUpdates::addCallableUpdate(
-			function () use ( $requester, $extra ) {
-				$this->dataStore->resetDatabaseLists( isNewChanges: true );
-				$limits = [ 'memory' => 0, 'filesize' => 0, 'time' => 0, 'walltime' => 0 ];
+        $this->dataStore->resetDatabaseLists( isNewChanges: true );
 
-				Shell::makeScriptCommand(
-					SetContainersAccess::class,
-					[ '--wiki', $this->dbname ]
-				)->limits( $limits )->execute();
+        $job = new PostCreateWikiJob(
+            [
+                'dbname' => $this->dbname,
+                'requester' => $requester,
+                'extra' => $extra,
+            ],
+            $this->extensionRegistry,
+            $this->hookRunner,
+            $this->cwdb
+        );
 
-				if ( !defined( 'MW_PHPUNIT_TEST' ) ) {
-					Shell::makeScriptCommand(
-						PopulateMainPage::class,
-						[ '--wiki', $this->dbname ]
-					)->limits( $limits )->execute();
-				}
-
-				if ( $this->extensionRegistry->isLoaded( 'CentralAuth' ) ) {
-					Shell::makeScriptCommand(
-						'CentralAuth:createLocalAccount',
-						[
-							$requester,
-							'--wiki', $this->dbname,
-						]
-					)->limits( $limits )->execute();
-
-					Shell::makeScriptCommand(
-						CreateAndPromote::class,
-						[
-							$requester,
-							'--bureaucrat',
-							'--interface-admin',
-							'--sysop',
-							'--force',
-							'--wiki', $this->dbname,
-						]
-					)->limits( $limits )->execute();
-				}
-
-				if ( $extra ) {
-					$this->hookRunner->onCreateWikiAfterCreationWithExtraData( $extra, $this->dbname );
-				}
-			},
-			DeferredUpdates::POSTSEND,
-			$this->cwdb
-		);
+        JobQueueGroup::singleton()->push( $job );
 
 		if ( $actor !== '' ) {
 			$notificationData = [
