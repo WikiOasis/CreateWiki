@@ -19,16 +19,14 @@ class PostCreateWikiJob extends Job {
     private array $extra;
 
     public function __construct(
-        array $params,
-        private readonly ExtensionRegistry $extensionRegistry,
-        private readonly CreateWikiHookRunner $hookRunner,
-        private readonly IDatabase $cwdb,
+        ExtensionRegistry $extensionRegistry,
+        CreateWikiHookRunner $hookRunner,
+        DBLoadBalancerFactory $lbFactory
     ) {
-        parent::__construct( self::JOB_NAME, $params );
-
-        $this->dbname = $params['dbname'];
-        $this->requester = $params['requester'];
-        $this->extra = $params['extra'];
+        parent::__construct( 'PostCreateWikiJob' );
+        $this->extensionRegistry = $extensionRegistry;
+        $this->hookRunner = $hookRunner;
+        $this->lbFactory = $lbFactory;
     }
 
     public function run(): bool {
