@@ -43,6 +43,15 @@
 			],
 			"needsPage": false
 		},
+        "PostCreateWikiJob": {
+            "class": "Miraheze\\CreateWiki\\Jobs\\PostCreateWikiJob",
+            "services": [
+                "CreateWikiHookRunner",
+                "ExtensionRegistry",
+                "DBLoadBalancerFactory"
+            ],
+            "needsPage": false
+        },
 		"RequestWikiAIJob": {
 			"class": "Miraheze\\CreateWiki\\Jobs\\RequestWikiAIJob",
 			"services": [
