@@ -105,7 +105,8 @@ return [
 			new ServiceOptions(
 				WikiManagerFactory::CONSTRUCTOR_OPTIONS,
 				$services->get( 'CreateWikiConfig' )
-			)
+			),
+            $services->getJobQueueGroup()
 		);
 	},
 	'WikiRequestManager' => static function ( MediaWikiServices $services ): WikiRequestManager {
