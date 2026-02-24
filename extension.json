@@ -46,8 +46,8 @@
         "PostCreateWikiJob": {
             "class": "Miraheze\\CreateWiki\\Jobs\\PostCreateWikiJob",
             "services": [
-                "CreateWikiHookRunner",
                 "ExtensionRegistry",
+                "CreateWikiHookRunner",
                 "DBLoadBalancerFactory"
             ],
             "needsPage": false
