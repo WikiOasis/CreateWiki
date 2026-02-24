@@ -275,8 +275,7 @@ class WikiManagerFactory {
                 'extra' => $extra,
             ],
             $this->extensionRegistry,
-            $this->hookRunner,
-            $this->cwdb
+            $this->hookRunner
         );
 
         $this->jobQueueGroup->push( $job );
