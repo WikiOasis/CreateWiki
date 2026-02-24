@@ -8,7 +8,6 @@ use MediaWiki\Registration\ExtensionRegistry;
 use MediaWiki\Shell\Shell;
 use MWExceptionHandler;
 use Miraheze\CreateWiki\Hooks\CreateWikiHookRunner;
-use Wikimedia\Rdbms\IDatabase;
 
 class PostCreateWikiJob extends Job {
 
@@ -19,14 +18,15 @@ class PostCreateWikiJob extends Job {
     private array $extra;
 
     public function __construct(
-        ExtensionRegistry $extensionRegistry,
-        CreateWikiHookRunner $hookRunner,
-        DBLoadBalancerFactory $lbFactory
+        array $params,
+        private readonly ExtensionRegistry $extensionRegistry,
+        private readonly CreateWikiHookRunner $hookRunner,
     ) {
-        parent::__construct( 'PostCreateWikiJob' );
-        $this->extensionRegistry = $extensionRegistry;
-        $this->hookRunner = $hookRunner;
-        $this->lbFactory = $lbFactory;
+        parent::__construct( self::JOB_NAME, $params );
+
+        $this->dbname = $params['dbname'];
+        $this->requester = $params['requester'];
+        $this->extra = $params['extra'] ?? [];
     }
 
     public function run(): bool {
@@ -45,7 +45,7 @@ class PostCreateWikiJob extends Job {
                 )->limits( $limits )->execute();
             }
 
-            if ( ExtensionRegistry::getInstance()->isLoaded( 'CentralAuth' ) ) {
+            if ( $this->extensionRegistry->isLoaded( 'CentralAuth' ) ) {
                 Shell::makeScriptCommand(
                     'CentralAuth:createLocalAccount',
                     [
