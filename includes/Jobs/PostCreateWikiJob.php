@@ -33,16 +33,6 @@ class PostCreateWikiJob extends Job {
         $limits = [ 'memory' => 0, 'filesize' => 0, 'time' => 0, 'walltime' => 0 ];
 
         try {
-            Shell::makeScriptCommand(
-                'SetContainersAccess',
-                [ '--wiki', $this->dbname ]
-            )->limits( $limits )->execute();
-
-            Shell::makeScriptCommand(
-                'PopulateMainPage',
-                [ '--wiki', $this->dbname ]
-            )->limits( $limits )->execute();
-
             if ( $this->extensionRegistry->isLoaded( 'CentralAuth' ) ) {
                 Shell::makeScriptCommand(
                     'CentralAuth:createLocalAccount',
