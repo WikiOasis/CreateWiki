@@ -34,12 +34,14 @@
 
 .ext-createwiki-deploygroups-wiki-list {
 	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 
 .ext-createwiki-deploygroups-wiki-item {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
+	display: grid;
+	grid-template-columns: minmax( 0, 1fr ) auto;
+	align-items: center;
 	gap: @spacing-50;
 	padding: @spacing-50 0;
 	border-bottom: @border-subtle;
@@ -59,6 +61,12 @@
 	align-items: center;
 	font-weight: @font-weight-semi-bold;
 	word-break: break-word;
+}
+
+@media ( max-width: 640px ) {
+	.ext-createwiki-deploygroups-wiki-item {
+		grid-template-columns: 1fr;
+	}
 }
 
 .ext-createwiki-deploygroups-empty-state {

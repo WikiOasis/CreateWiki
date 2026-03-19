@@ -37,7 +37,8 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 		if ( !$this->databaseUtils->isCurrentWikiCentral() ) {
 			throw new ErrorPageError( 'errorpagetitle', 'createwiki-wikinotcentralwiki' );
 		}
-		$this->getOutput()->addModules( [ 'ext.createwiki.deploygroups.codex' ] );
+		$this->getOutput()->addModuleStyles( [ 'ext.createwiki.deploygroups.codex' ] );
+		$this->getOutput()->addModules( [ 'ext.createwiki.deploygroups' ] );
 
 		parent::execute( $par );
 		$this->showGroupsTable();
@@ -411,7 +412,7 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 			Html::rawElement(
 				'p',
 				[
-					'class' => 'ext-createwiki-deploygroups-empty-state',
+					'class' => 'ext-createwiki-deploygroups-empty-state ext-createwiki-deploygroups-empty-state--hidden',
 					'data-mw-createwiki-deploygroups-empty-state' => '',
 				],
 				$this->msg( 'createwiki-deploygroups-search-empty' )->escaped()

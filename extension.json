@@ -307,16 +307,18 @@
 	"ResourceModules": {
 		"ext.createwiki.deploygroups.codex": {
 			"class": "MediaWiki\\ResourceLoader\\CodexModule",
-			"scripts": "ext.createwiki.deploygroups.codex.js",
 			"styles": "ext.createwiki.deploygroups.codex.less",
-			"dependencies": [
-				"jquery"
-			],
 			"codexStyleOnly": true,
 			"codexComponents": [
 				"CdxButton",
 				"CdxSelect",
 				"CdxTextInput"
+			]
+		},
+		"ext.createwiki.deploygroups": {
+			"scripts": "ext.createwiki.deploygroups.codex.js",
+			"dependencies": [
+				"jquery"
 			]
 		},
 		"ext.createwiki.oouiform": {
