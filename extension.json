@@ -86,6 +86,7 @@
 		"requestwiki"
 	],
 	"LogActionsHandlers": {
+		"deploymentgroups/*": "MediaWiki\\Logging\\LogFormatter",
 		"farmer/createwiki": "MediaWiki\\Logging\\LogFormatter",
 		"farmer/comment": "MediaWiki\\Logging\\LogFormatter",
 		"farmer/create-failure": "MediaWiki\\Logging\\LogFormatter",
@@ -98,14 +99,17 @@
 		"farmersuppression/*": "MediaWiki\\Logging\\LogFormatter"
 	},
 	"LogHeaders": {
+		"deploymentgroups": "deploymentgroups-log-header",
 		"farmer": "farmer-log-header",
 		"farmersuppression": "farmersuppression-log-header"
 	},
 	"LogNames": {
+		"deploymentgroups": "deploymentgroups-log-name",
 		"farmer": "farmer-log-name",
 		"farmersuppression": "farmersuppression-log-name"
 	},
 	"LogTypes": [
+		"deploymentgroups",
 		"farmer",
 		"farmersuppression"
 	],
@@ -113,6 +117,20 @@
 		"farmersuppression": "createwiki-suppressionlog"
 	},
 	"ActionFilteredLogs": {
+		"deploymentgroups": {
+			"create": [
+				"create"
+			],
+			"pin": [
+				"pin"
+			],
+			"assign": [
+				"assign"
+			],
+			"setmembers": [
+				"setmembers"
+			]
+		},
 		"farmer": {
 			"createwiki": [
 				"createwiki"

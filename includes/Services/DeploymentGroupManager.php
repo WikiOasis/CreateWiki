@@ -6,7 +6,9 @@ use InvalidArgumentException;
 use MediaWiki\Config\ServiceOptions;
 use Miraheze\CreateWiki\ConfigNames;
 use stdClass;
+use function array_fill_keys;
 use function array_key_exists;
+use function array_keys;
 use function preg_match;
 use function strlen;
 use function strtolower;
@@ -231,6 +233,167 @@ class DeploymentGroupManager {
 			->where( [ 'wiki_deployment_group' => $groupName ] )
 			->caller( __METHOD__ )
 			->fetchRowCount();
+	}
+
+	public function getWikisByGroup(): array {
+		$groups = [];
+		foreach ( $this->getGroups() as $groupName => $_deployment ) {
+			$groups[$groupName] = [];
+		}
+
+		$defaultGroup = $this->getDefaultGroup();
+		if ( !array_key_exists( $defaultGroup, $groups ) ) {
+			$groups[$defaultGroup] = [];
+		}
+
+		$dbr = $this->databaseUtils->getGlobalReplicaDB();
+		$res = $dbr->newSelectQueryBuilder()
+			->select( [ 'wiki_dbname', 'wiki_deployment_group' ] )
+			->from( 'cw_wikis' )
+			->orderBy( 'wiki_dbname' )
+			->caller( __METHOD__ )
+			->fetchResultSet();
+
+		foreach ( $res as $row ) {
+			if ( !$row instanceof stdClass ) {
+				continue;
+			}
+
+			$resolvedGroup = $defaultGroup;
+			try {
+				$candidateGroup = $this->normalizeGroupName( (string)$row->wiki_deployment_group );
+				if ( array_key_exists( $candidateGroup, $groups ) ) {
+					$resolvedGroup = $candidateGroup;
+				}
+			} catch ( InvalidArgumentException ) {
+				$resolvedGroup = $defaultGroup;
+			}
+
+			$groups[$resolvedGroup][] = $row->wiki_dbname;
+		}
+
+		return $groups;
+	}
+
+	public function replaceGroupMembers( string $groupName, array $wikiDbnames ): ?array {
+		$groupName = $this->normalizeGroupName( $groupName );
+		$defaultGroup = $this->getDefaultGroup();
+		if ( !$this->groupExists( $groupName ) ) {
+			if ( $groupName !== $defaultGroup ) {
+				return null;
+			}
+
+			$this->ensureDefaultGroupExists();
+		}
+
+		$normalizedWikis = [];
+		foreach ( $wikiDbnames as $wikiDbname ) {
+			$wikiDbname = strtolower( trim( (string)$wikiDbname ) );
+			if ( $wikiDbname === '' ) {
+				continue;
+			}
+
+			$normalizedWikis[$wikiDbname] = true;
+		}
+
+		$wikiDbnames = array_keys( $normalizedWikis );
+		$dbw = $this->databaseUtils->getGlobalPrimaryDB();
+
+		$existingWikiMap = [];
+		if ( $wikiDbnames ) {
+			$existingWikisRes = $dbw->newSelectQueryBuilder()
+				->select( 'wiki_dbname' )
+				->from( 'cw_wikis' )
+				->where( [ 'wiki_dbname' => $wikiDbnames ] )
+				->caller( __METHOD__ )
+				->fetchResultSet();
+
+			foreach ( $existingWikisRes as $row ) {
+				if ( !$row instanceof stdClass ) {
+					continue;
+				}
+
+				$existingWikiMap[$row->wiki_dbname] = true;
+			}
+		}
+
+		$missing = [];
+		foreach ( $wikiDbnames as $wikiDbname ) {
+			if ( !array_key_exists( $wikiDbname, $existingWikiMap ) ) {
+				$missing[] = $wikiDbname;
+			}
+		}
+
+		if ( $missing ) {
+			return [
+				'added' => [],
+				'missing' => $missing,
+				'removed' => [],
+			];
+		}
+
+		$currentWikisRes = $dbw->newSelectQueryBuilder()
+			->select( 'wiki_dbname' )
+			->from( 'cw_wikis' )
+			->where( [ 'wiki_deployment_group' => $groupName ] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
+
+		$currentWikis = [];
+		foreach ( $currentWikisRes as $row ) {
+			if ( !$row instanceof stdClass ) {
+				continue;
+			}
+
+			$currentWikis[] = $row->wiki_dbname;
+		}
+
+		$currentWikiMap = array_fill_keys( $currentWikis, true );
+		$targetWikiMap = array_fill_keys( $wikiDbnames, true );
+
+		$toAdd = [];
+		foreach ( $wikiDbnames as $wikiDbname ) {
+			if ( !array_key_exists( $wikiDbname, $currentWikiMap ) ) {
+				$toAdd[] = $wikiDbname;
+			}
+		}
+
+		$toRemove = [];
+		foreach ( $currentWikis as $wikiDbname ) {
+			if ( !array_key_exists( $wikiDbname, $targetWikiMap ) ) {
+				$toRemove[] = $wikiDbname;
+			}
+		}
+
+		if ( $toAdd ) {
+			$dbw->newUpdateQueryBuilder()
+				->update( 'cw_wikis' )
+				->set( [ 'wiki_deployment_group' => $groupName ] )
+				->where( [ 'wiki_dbname' => $toAdd ] )
+				->caller( __METHOD__ )
+				->execute();
+		}
+
+		if ( $toRemove && $groupName !== $defaultGroup ) {
+			if ( !$this->groupExists( $defaultGroup ) ) {
+				$this->ensureDefaultGroupExists();
+			}
+
+			$dbw->newUpdateQueryBuilder()
+				->update( 'cw_wikis' )
+				->set( [ 'wiki_deployment_group' => $defaultGroup ] )
+				->where( [ 'wiki_dbname' => $toRemove ] )
+				->caller( __METHOD__ )
+				->execute();
+		} else {
+			$toRemove = [];
+		}
+
+		return [
+			'added' => $toAdd,
+			'missing' => [],
+			'removed' => $toRemove,
+		];
 	}
 
 	private function normalizeGroupName( string $groupName ): string {

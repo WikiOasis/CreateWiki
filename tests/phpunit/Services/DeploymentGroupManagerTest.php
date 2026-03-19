@@ -45,6 +45,22 @@ class DeploymentGroupManagerTest extends MediaWikiIntegrationTestCase {
 			] )
 			->caller( __METHOD__ )
 			->execute();
+
+		$dbw->newInsertQueryBuilder()
+			->insertInto( 'cw_wikis' )
+			->ignore()
+			->row( [
+				'wiki_dbname' => 'examplewiki',
+				'wiki_dbcluster' => 'c1',
+				'wiki_sitename' => 'ExampleWiki',
+				'wiki_language' => 'en',
+				'wiki_private' => 0,
+				'wiki_creation' => $dbw->timestamp(),
+				'wiki_category' => 'test',
+				'wiki_deployment_group' => 'default',
+			] )
+			->caller( __METHOD__ )
+			->execute();
 	}
 
 	private function getManager(): DeploymentGroupManager {
@@ -99,5 +115,56 @@ class DeploymentGroupManagerTest extends MediaWikiIntegrationTestCase {
 
 		$this->assertSame( 'betatest', $row->wiki_deployment_group );
 		$this->assertSame( 'mw-1.45-beta', $manager->resolveWikiDeployment( 'betatest' ) );
+	}
+
+	/**
+	 * @covers ::getWikisByGroup
+	 */
+	public function testGetWikisByGroup(): void {
+		$manager = $this->getManager();
+		$wikisByGroup = $manager->getWikisByGroup();
+
+		$this->assertArrayHasKey( 'default', $wikisByGroup );
+		$this->assertContains( WikiMap::getCurrentWikiId(), $wikisByGroup['default'] );
+		$this->assertContains( 'examplewiki', $wikisByGroup['default'] );
+	}
+
+	/**
+	 * @covers ::replaceGroupMembers
+	 */
+	public function testReplaceGroupMembers(): void {
+		$manager = $this->getManager();
+		if ( !$manager->createGroup( 'memberset', 'mw-1.45-memberset' ) ) {
+			$this->assertTrue( $manager->setGroupDeployment( 'memberset', 'mw-1.45-memberset' ) );
+		}
+
+		$result = $manager->replaceGroupMembers( 'memberset', [ WikiMap::getCurrentWikiId(), 'examplewiki' ] );
+		$this->assertNotNull( $result );
+		$this->assertSame( [], $result['missing'] );
+		$this->assertSameCanonicalizing( [ WikiMap::getCurrentWikiId(), 'examplewiki' ], $result['added'] );
+
+		$row = $this->getDb()->newSelectQueryBuilder()
+			->select( 'wiki_deployment_group' )
+			->from( 'cw_wikis' )
+			->where( [ 'wiki_dbname' => 'examplewiki' ] )
+			->caller( __METHOD__ )
+			->fetchRow();
+		$this->assertSame( 'memberset', $row->wiki_deployment_group );
+
+		$result = $manager->replaceGroupMembers( 'memberset', [ WikiMap::getCurrentWikiId() ] );
+		$this->assertNotNull( $result );
+		$this->assertSame( [ 'examplewiki' ], $result['removed'] );
+
+		$row = $this->getDb()->newSelectQueryBuilder()
+			->select( 'wiki_deployment_group' )
+			->from( 'cw_wikis' )
+			->where( [ 'wiki_dbname' => 'examplewiki' ] )
+			->caller( __METHOD__ )
+			->fetchRow();
+		$this->assertSame( 'default', $row->wiki_deployment_group );
+
+		$result = $manager->replaceGroupMembers( 'memberset', [ 'missingwiki' ] );
+		$this->assertNotNull( $result );
+		$this->assertSame( [ 'missingwiki' ], $result['missing'] );
 	}
 }
