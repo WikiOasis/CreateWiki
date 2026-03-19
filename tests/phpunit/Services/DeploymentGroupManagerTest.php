@@ -167,4 +167,28 @@ class DeploymentGroupManagerTest extends MediaWikiIntegrationTestCase {
 		$this->assertNotNull( $result );
 		$this->assertSame( [ 'missingwiki' ], $result['missing'] );
 	}
+
+	/**
+	 * @covers ::assignWikiToGroup
+	 * @covers ::deleteGroup
+	 */
+	public function testDeleteGroup(): void {
+		$manager = $this->getManager();
+		if ( !$manager->createGroup( 'deleteme', 'mw-1.45-delete' ) ) {
+			$this->assertTrue( $manager->setGroupDeployment( 'deleteme', 'mw-1.45-delete' ) );
+		}
+
+		$this->assertTrue( $manager->assignWikiToGroup( 'examplewiki', 'deleteme' ) );
+		$this->assertTrue( $manager->deleteGroup( 'deleteme' ) );
+		$this->assertFalse( $manager->groupExists( 'deleteme' ) );
+		$this->assertFalse( $manager->deleteGroup( 'default' ) );
+
+		$row = $this->getDb()->newSelectQueryBuilder()
+			->select( 'wiki_deployment_group' )
+			->from( 'cw_wikis' )
+			->where( [ 'wiki_dbname' => 'examplewiki' ] )
+			->caller( __METHOD__ )
+			->fetchRow();
+		$this->assertSame( 'default', $row->wiki_deployment_group );
+	}
 }

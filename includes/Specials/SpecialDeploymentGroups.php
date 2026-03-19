@@ -14,7 +14,9 @@ use Miraheze\CreateWiki\Services\DeploymentGroupManager;
 use function array_keys;
 use function count;
 use function implode;
+use function ksort;
 use function preg_split;
+use function strtolower;
 use function trim;
 
 class SpecialDeploymentGroups extends FormSpecialPage {
@@ -35,6 +37,7 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 		if ( !$this->databaseUtils->isCurrentWikiCentral() ) {
 			throw new ErrorPageError( 'errorpagetitle', 'createwiki-wikinotcentralwiki' );
 		}
+		$this->getOutput()->addModules( [ 'ext.createwiki.deploygroups.codex' ] );
 
 		parent::execute( $par );
 		$this->showGroupsTable();
@@ -52,6 +55,7 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 					'createwiki-deploygroups-action-pin' => 'pin',
 					'createwiki-deploygroups-action-assign' => 'assign',
 					'createwiki-deploygroups-action-setmembers' => 'setmembers',
+					'createwiki-deploygroups-action-delete' => 'delete',
 				],
 			],
 			'groupname' => [
@@ -201,6 +205,39 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 						)->escaped()
 					) );
 					return Status::newGood();
+				case 'delete':
+					if ( $groupName === '' ) {
+						return Status::newFatal( 'createwiki-deploygroups-error-missing-fields' );
+					}
+
+					$defaultGroup = $this->deploymentGroupManager->getDefaultGroup();
+					if ( $groupName === $defaultGroup ) {
+						return Status::newFatal( 'createwiki-deploygroups-error-delete-default' );
+					}
+
+					$movedCount = $this->deploymentGroupManager->countWikisInGroup( $groupName );
+					if ( !$this->deploymentGroupManager->deleteGroup( $groupName ) ) {
+						return Status::newFatal( 'createwiki-deploygroups-error-group-missing' );
+					}
+
+					$this->dataStore->resetDatabaseLists( isNewChanges: true );
+					$this->logGroupAction(
+						'delete',
+						[
+							'4::group' => $groupName,
+							'5::moved' => $movedCount,
+							'6::default' => $defaultGroup,
+						]
+					);
+					$this->getOutput()->addHTML( Html::successBox(
+						$this->msg(
+							'createwiki-deploygroups-success-deleted',
+							$groupName,
+							$movedCount,
+							$defaultGroup
+						)->escaped()
+					) );
+					return Status::newGood();
 				default:
 					return Status::newFatal( 'createwiki-deploygroups-error-invalid-action' );
 			}
@@ -212,6 +249,7 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 	private function showGroupsTable(): void {
 		$groups = $this->deploymentGroupManager->getGroups();
 		$wikisByGroup = $this->deploymentGroupManager->getWikisByGroup();
+		$defaultGroup = $this->deploymentGroupManager->getDefaultGroup();
 		$rows = '';
 
 		foreach ( $groups as $groupName => $deployment ) {
@@ -222,15 +260,7 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 				Html::element( 'td', [], $groupName ) .
 				Html::element( 'td', [], $deployment ) .
 				Html::element( 'td', [], (string)count( $groupWikis ) ) .
-				Html::rawElement(
-					'td',
-					[],
-					Html::rawElement(
-						'pre',
-						[ 'class' => 'mw-createwiki-deploygroups-wikilist' ],
-						implode( "\n", $groupWikis )
-					)
-				)
+				Html::rawElement( 'td', [], $this->getGroupActionsCell( $groupName, $defaultGroup ) )
 			);
 		}
 
@@ -248,10 +278,196 @@ class SpecialDeploymentGroups extends FormSpecialPage {
 				Html::element( 'th', [], $this->msg( 'createwiki-deploygroups-label-groupname' )->text() ) .
 				Html::element( 'th', [], $this->msg( 'createwiki-deploygroups-label-deployment' )->text() ) .
 				Html::element( 'th', [], $this->msg( 'createwiki-deploygroups-label-membercount' )->text() ) .
-				Html::element( 'th', [], $this->msg( 'createwiki-deploygroups-label-wikis' )->text() )
+				Html::element( 'th', [], $this->msg( 'createwiki-deploygroups-label-actions' )->text() )
 			) .
 			$rows
 		) );
+
+		$this->showWikiAssignmentsList( $groups, $wikisByGroup );
+	}
+
+	private function getGroupActionsCell( string $groupName, string $defaultGroup ): string {
+		if ( $groupName === $defaultGroup ) {
+			return Html::rawElement(
+				'span',
+				[ 'class' => 'ext-createwiki-deploygroups-default-group-note' ],
+				$this->msg( 'createwiki-deploygroups-default-protected' )->escaped()
+			);
+		}
+
+		$actionUrl = $this->getPageTitle()->getLocalURL();
+		return Html::rawElement(
+			'form',
+			[
+				'action' => $actionUrl,
+				'class' => 'ext-createwiki-deploygroups-inline-form',
+				'method' => 'post',
+			],
+			$this->getActionHiddenFields(
+				action: 'delete',
+				groupName: $groupName
+			) .
+			Html::element(
+				'button',
+				[
+					'class' => 'cdx-button cdx-button--action-destructive cdx-button--weight-quiet',
+					'type' => 'submit',
+				],
+				$this->msg( 'createwiki-deploygroups-delete' )->text()
+			)
+		);
+	}
+
+	private function showWikiAssignmentsList( array $groups, array $wikisByGroup ): void {
+		$wikiGroups = [];
+		foreach ( $wikisByGroup as $groupName => $groupWikis ) {
+			foreach ( $groupWikis as $wikiDbname ) {
+				$wikiGroups[$wikiDbname] = $groupName;
+			}
+		}
+		ksort( $wikiGroups );
+
+		$listRows = '';
+		$actionUrl = $this->getPageTitle()->getLocalURL();
+		foreach ( $wikiGroups as $wikiDbname => $groupName ) {
+			$listRows .= Html::rawElement(
+				'li',
+				[
+					'class' => 'ext-createwiki-deploygroups-wiki-item',
+					'data-mw-createwiki-deploygroups-item' => '',
+					'data-mw-createwiki-deploygroups-search-text' => strtolower( $wikiDbname . ' ' . $groupName ),
+				],
+				Html::element(
+					'span',
+					[ 'class' => 'ext-createwiki-deploygroups-wiki-name' ],
+					$wikiDbname
+				) .
+				Html::rawElement(
+					'form',
+					[
+						'action' => $actionUrl,
+						'class' => 'ext-createwiki-deploygroups-inline-form',
+						'method' => 'post',
+					],
+					$this->getActionHiddenFields(
+						action: 'assign',
+						groupName: null,
+						dbname: $wikiDbname
+					) .
+					$this->getGroupSelect( $groups, $groupName ) .
+					Html::element(
+						'button',
+						[
+							'class' => 'cdx-button cdx-button--weight-primary',
+							'type' => 'submit',
+						],
+						$this->msg( 'createwiki-deploygroups-inline-save' )->text()
+					)
+				)
+			);
+		}
+
+		$this->getOutput()->addHTML( Html::rawElement(
+			'h2',
+			[],
+			$this->msg( 'createwiki-deploygroups-wikilist-heading' )->text()
+		) );
+
+		$this->getOutput()->addHTML(
+			Html::rawElement(
+				'label',
+				[
+					'class' => 'ext-createwiki-deploygroups-search-label',
+					'for' => 'ext-createwiki-deploygroups-search',
+				],
+				$this->msg( 'createwiki-deploygroups-label-search' )->escaped()
+			) .
+			Html::rawElement(
+				'div',
+				[
+					'class' => 'cdx-text-input ext-createwiki-deploygroups-search-input',
+				],
+				Html::element(
+					'input',
+					[
+						'aria-label' => $this->msg( 'createwiki-deploygroups-label-search' )->text(),
+						'class' => 'cdx-text-input__input',
+						'data-mw-createwiki-deploygroups-search' => '',
+						'id' => 'ext-createwiki-deploygroups-search',
+						'placeholder' => $this->msg( 'createwiki-deploygroups-placeholder-search' )->text(),
+						'type' => 'search',
+					]
+				)
+			) .
+			Html::rawElement(
+				'div',
+				[ 'class' => 'ext-createwiki-deploygroups-wiki-list-scroll' ],
+				Html::rawElement(
+					'ul',
+					[ 'class' => 'ext-createwiki-deploygroups-wiki-list' ],
+					$listRows
+				)
+			) .
+			Html::rawElement(
+				'p',
+				[
+					'class' => 'ext-createwiki-deploygroups-empty-state',
+					'data-mw-createwiki-deploygroups-empty-state' => '',
+				],
+				$this->msg( 'createwiki-deploygroups-search-empty' )->escaped()
+			)
+		);
+	}
+
+	private function getActionHiddenFields(
+		string $action,
+		?string $groupName = '',
+		?string $deployment = '',
+		?string $dbname = '',
+		?string $wikis = ''
+	): string {
+		$fields = [
+			'title' => $this->getPageTitle()->getPrefixedText(),
+			'wpEditToken' => $this->getUser()->getEditToken(),
+			'wpdeployaction' => $action,
+			'wpgroupname' => $groupName,
+			'wpdeployment' => $deployment,
+			'wpdbname' => $dbname,
+			'wpwikis' => $wikis,
+		];
+
+		$html = '';
+		foreach ( $fields as $name => $value ) {
+			if ( $value === null ) {
+				continue;
+			}
+
+			$html .= Html::hidden( $name, $value );
+		}
+
+		return $html;
+	}
+
+	private function getGroupSelect( array $groups, string $selectedGroup ): string {
+		$options = '';
+		foreach ( $groups as $groupName => $_deployment ) {
+			$attributes = [ 'value' => $groupName ];
+			if ( $groupName === $selectedGroup ) {
+				$attributes['selected'] = 'selected';
+			}
+
+			$options .= Html::element( 'option', $attributes, $groupName );
+		}
+
+		return Html::rawElement(
+			'select',
+			[
+				'aria-label' => $this->msg( 'createwiki-deploygroups-label-groupname' )->text(),
+				'class' => 'cdx-select',
+				'name' => 'wpgroupname',
+			],
+			$options
+		);
 	}
 
 	private function parseWikiList( string $wikiList ): array {

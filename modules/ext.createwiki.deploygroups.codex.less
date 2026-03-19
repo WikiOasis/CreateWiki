@@ -1,0 +1,72 @@
+@import 'mediawiki.skin.variables.less';
+
+.ext-createwiki-deploygroups-inline-form {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: @spacing-50;
+	align-items: center;
+	margin: 0;
+}
+
+.ext-createwiki-deploygroups-default-group-note {
+	color: @color-subtle;
+	font-style: italic;
+}
+
+.ext-createwiki-deploygroups-search-label {
+	display: block;
+	margin-bottom: @spacing-35;
+	font-weight: @font-weight-bold;
+}
+
+.ext-createwiki-deploygroups-search-input {
+	max-width: 28rem;
+	margin-bottom: @spacing-75;
+}
+
+.ext-createwiki-deploygroups-wiki-list-scroll {
+	max-height: 26rem;
+	overflow-y: auto;
+	padding: @spacing-35 @spacing-35 0;
+	border: @border-subtle;
+	border-radius: @border-radius-base;
+}
+
+.ext-createwiki-deploygroups-wiki-list {
+	margin: 0;
+}
+
+.ext-createwiki-deploygroups-wiki-item {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: @spacing-50;
+	padding: @spacing-50 0;
+	border-bottom: @border-subtle;
+	list-style: none;
+}
+
+.ext-createwiki-deploygroups-wiki-item:last-child {
+	border-bottom: 0;
+}
+
+.ext-createwiki-deploygroups-wiki-item--hidden {
+	display: none;
+}
+
+.ext-createwiki-deploygroups-wiki-name {
+	display: inline-flex;
+	align-items: center;
+	font-weight: @font-weight-semi-bold;
+	word-break: break-word;
+}
+
+.ext-createwiki-deploygroups-empty-state {
+	margin-top: @spacing-50;
+	color: @color-subtle;
+	font-style: italic;
+}
+
+.ext-createwiki-deploygroups-empty-state--hidden {
+	display: none;
+}

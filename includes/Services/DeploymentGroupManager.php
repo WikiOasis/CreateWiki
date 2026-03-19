@@ -132,6 +132,35 @@ class DeploymentGroupManager {
 		return true;
 	}
 
+	public function deleteGroup( string $groupName ): bool {
+		$groupName = $this->normalizeGroupName( $groupName );
+		$defaultGroup = $this->getDefaultGroup();
+
+		if ( $groupName === $defaultGroup || !$this->groupExists( $groupName ) ) {
+			return false;
+		}
+
+		if ( !$this->groupExists( $defaultGroup ) ) {
+			$this->ensureDefaultGroupExists();
+		}
+
+		$dbw = $this->databaseUtils->getGlobalPrimaryDB();
+		$dbw->newUpdateQueryBuilder()
+			->update( 'cw_wikis' )
+			->set( [ 'wiki_deployment_group' => $defaultGroup ] )
+			->where( [ 'wiki_deployment_group' => $groupName ] )
+			->caller( __METHOD__ )
+			->execute();
+
+		$dbw->newDeleteQueryBuilder()
+			->deleteFrom( 'cw_deployment_groups' )
+			->where( [ 'cdg_name' => $groupName ] )
+			->caller( __METHOD__ )
+			->execute();
+
+		return (bool)$dbw->affectedRows();
+	}
+
 	public function setGroupDeployment( string $groupName, string $deployment ): bool {
 		$groupName = $this->normalizeGroupName( $groupName );
 		$deployment = $this->normalizeDeployment( $deployment );
