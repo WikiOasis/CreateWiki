@@ -347,7 +347,13 @@ class RemoteWiki {
 	}
 
 	public function getDeploymentGroupOptions(): array {
-		return $this->deploymentGroupManager->getGroups();
+		$options = [];
+
+		foreach ( array_keys( $this->deploymentGroupManager->getGroups() ) as $groupName ) {
+			$options[$groupName] = $groupName;
+		}
+
+		return $options;
 	}
 
 	public function setDeploymentGroup( string $groupName ): void {
