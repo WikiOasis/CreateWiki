@@ -11,6 +11,7 @@ use Miraheze\CreateWiki\Helpers\RemoteWiki;
 use Miraheze\CreateWiki\Hooks\CreateWikiHookRunner;
 use Miraheze\CreateWiki\Services\CreateWikiDatabaseUtils;
 use Miraheze\CreateWiki\Services\CreateWikiDataStore;
+use Miraheze\CreateWiki\Services\DeploymentGroupManager;
 use Miraheze\ManageWiki\Exceptions\MissingWikiError as MWMissingWikiError;
 use Miraheze\ManageWiki\Helpers\Factories\ModuleFactory;
 use Miraheze\ManageWiki\Hooks\ManageWikiCoreProviderHook;
@@ -23,6 +24,7 @@ class ManageWiki implements ManageWikiCoreProviderHook {
 		private readonly Config $config,
 		private readonly CreateWikiDatabaseUtils $databaseUtils,
 		private readonly CreateWikiDataStore $dataStore,
+		private readonly DeploymentGroupManager $deploymentGroupManager,
 		private readonly CreateWikiHookRunner $hookRunner,
 		private readonly JobQueueGroupFactory $jobQueueGroupFactory,
 	) {
@@ -39,6 +41,7 @@ class ManageWiki implements ManageWikiCoreProviderHook {
 			$provider = new ManageWikiCoreModule(
 				$this->databaseUtils,
 				$this->dataStore,
+				$this->deploymentGroupManager,
 				$this->hookRunner,
 				$this->jobQueueGroupFactory,
 				new ServiceOptions(

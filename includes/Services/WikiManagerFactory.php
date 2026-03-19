@@ -63,6 +63,7 @@ class WikiManagerFactory {
 	public function __construct(
 		private readonly CreateWikiDatabaseUtils $databaseUtils,
 		private readonly CreateWikiDataStore $dataStore,
+		private readonly DeploymentGroupManager $deploymentGroupManager,
 		private readonly CreateWikiHookRunner $hookRunner,
 		private readonly CreateWikiNotificationsManager $notificationsManager,
 		private readonly CreateWikiValidator $validator,
@@ -220,6 +221,7 @@ class WikiManagerFactory {
 		// Filter $extra to only include keys present in $extraFields
 		$filteredData = array_intersect_key( $extra, array_flip( $extraFields ) );
 		$extraData = json_encode( $filteredData ) ?: '[]';
+		$deploymentGroup = $this->deploymentGroupManager->ensureDefaultGroupExists();
 
 		$this->cwdb->newInsertQueryBuilder()
 			->insertInto( 'cw_wikis' )
@@ -231,6 +233,7 @@ class WikiManagerFactory {
 				'wiki_private' => (int)$private,
 				'wiki_creation' => $this->dbw->timestamp(),
 				'wiki_category' => $category,
+				'wiki_deployment_group' => $deploymentGroup,
 				'wiki_extra' => $extraData,
 			] )
 			->caller( __METHOD__ )

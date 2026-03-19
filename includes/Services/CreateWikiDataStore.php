@@ -11,6 +11,7 @@ use stdClass;
 use Wikimedia\ObjectCache\BagOStuff;
 use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\StaticArrayWriter;
+use function array_key_exists;
 use function array_keys;
 use function file_put_contents;
 use function function_exists;
@@ -44,6 +45,7 @@ class CreateWikiDataStore {
 	public function __construct(
 		ObjectCacheFactory $objectCacheFactory,
 		private readonly CreateWikiDatabaseUtils $databaseUtils,
+		private readonly DeploymentGroupManager $deploymentGroupManager,
 		private readonly CreateWikiHookRunner $hookRunner,
 		private readonly ServiceOptions $options,
 	) {
@@ -136,12 +138,16 @@ class CreateWikiDataStore {
 		}
 
 		$this->dbr ??= $this->databaseUtils->getGlobalReplicaDB();
+		$defaultGroup = $this->deploymentGroupManager->getDefaultGroup();
+		$defaultDeployment = $this->deploymentGroupManager->getDefaultDeployment();
+		$deploymentGroups = $this->deploymentGroupManager->getGroups();
 		$databaseList = $this->dbr->newSelectQueryBuilder()
 			->table( 'cw_wikis' )
 			->fields( [
 				'wiki_dbcluster',
 				'wiki_dbname',
 				'wiki_deleted',
+				'wiki_deployment_group',
 				'wiki_sitename',
 				'wiki_url',
 			] )
@@ -159,6 +165,13 @@ class CreateWikiDataStore {
 				's' => $row->wiki_sitename,
 				'c' => $row->wiki_dbcluster,
 			];
+			$group = $this->deploymentGroupManager->resolveWikiGroup( $row->wiki_deployment_group );
+			if ( !array_key_exists( $group, $deploymentGroups ) ) {
+				$group = $defaultGroup;
+			}
+
+			$databases[$row->wiki_dbname]['g'] = $group;
+			$databases[$row->wiki_dbname]['v'] = $deploymentGroups[$group] ?? $defaultDeployment;
 
 			if ( $row->wiki_url !== null ) {
 				$databases[$row->wiki_dbname]['u'] = $row->wiki_url;
@@ -168,6 +181,8 @@ class CreateWikiDataStore {
 		$list = [
 			'mtime' => $mtime,
 			'databases' => $databases,
+			'defaultDeploymentGroup' => $defaultGroup,
+			'defaultDeploymentId' => $defaultDeployment,
 		];
 
 		$this->writeToFile( 'databases', $list );

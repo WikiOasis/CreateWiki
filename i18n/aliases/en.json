@@ -3,6 +3,9 @@
 		"CreateWiki": [
 			"CreateWiki"
 		],
+		"DeploymentGroups": [
+			"DeploymentGroups"
+		],
 		"RequestWiki": [
 			"RequestWiki"
 		],

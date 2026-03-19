@@ -82,6 +82,7 @@
 		"createwiki-deleterequest",
 		"createwiki-suppressionlog",
 		"createwiki-suppressrequest",
+		"deploygroups",
 		"requestwiki"
 	],
 	"LogActionsHandlers": {
@@ -162,6 +163,14 @@
 				"WikiManagerFactory"
 			]
 		},
+		"DeploymentGroups": {
+			"class": "Miraheze\\CreateWiki\\Specials\\SpecialDeploymentGroups",
+			"services": [
+				"CreateWikiDatabaseUtils",
+				"CreateWikiDataStore",
+				"DeploymentGroupManager"
+			]
+		},
 		"RequestWiki": {
 			"class": "Miraheze\\CreateWiki\\RequestWiki\\Specials\\SpecialRequestWiki",
 			"services": [
@@ -235,6 +244,7 @@
 				"CreateWikiConfig",
 				"CreateWikiDatabaseUtils",
 				"CreateWikiDataStore",
+				"DeploymentGroupManager",
 				"CreateWikiHookRunner",
 				"JobQueueGroupFactory"
 			]
@@ -342,6 +352,14 @@
 		"CreateWikiDatabaseSuffix": {
 			"description": "String. Database suffix.",
 			"value": "wiki"
+		},
+		"CreateWikiDeploymentGroupsDefaultDeployment": {
+			"description": "String. Default deployment identifier pinned to the built-in default deployment group.",
+			"value": "stable"
+		},
+		"CreateWikiDeploymentGroupsDefaultGroup": {
+			"description": "String. Deployment group automatically assigned to newly created wikis.",
+			"value": "default"
 		},
 		"CreateWikiDisallowedSubdomains": {
 			"description": "Array. Regexes to match for disallowed subdomains.",

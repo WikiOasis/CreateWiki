@@ -36,6 +36,8 @@ class WikiManagerFactoryTest extends MediaWikiIntegrationTestCase {
 		$this->overrideConfigValues( [
 			ConfigNames::DatabaseClusters => [ 'c1', 'c2' ],
 			ConfigNames::DatabaseSuffix => 'test',
+			ConfigNames::DeploymentGroupsDefaultDeployment => 'stable',
+			ConfigNames::DeploymentGroupsDefaultGroup => 'newwikis',
 			ConfigNames::SQLFiles => [
 				MW_INSTALL_PATH . '/sql/mysql/tables-generated.sql',
 			],
@@ -129,6 +131,7 @@ class WikiManagerFactoryTest extends MediaWikiIntegrationTestCase {
 	public function testCreateSuccess(): void {
 		$this->assertNull( $this->createWiki( dbname: 'createwikitest', private: false ) );
 		$this->assertTrue( $this->wikiExists( 'createwikitest' ) );
+		$this->assertSame( 'newwikis', $this->getWikiDeploymentGroup( 'createwikitest' ) );
 	}
 
 	/**
@@ -324,6 +327,17 @@ class WikiManagerFactoryTest extends MediaWikiIntegrationTestCase {
 	private function wikiExists( string $dbname ): bool {
 		$wikiManager = $this->getFactoryService()->newInstance( $dbname );
 		return $wikiManager->exists();
+	}
+
+	private function getWikiDeploymentGroup( string $dbname ): ?string {
+		$row = $this->getDb()->newSelectQueryBuilder()
+			->select( 'wiki_deployment_group' )
+			->from( 'cw_wikis' )
+			->where( [ 'wiki_dbname' => $dbname ] )
+			->caller( __METHOD__ )
+			->fetchRow();
+
+		return $row->wiki_deployment_group ?? null;
 	}
 
 	private function setupLBFactory(): void {

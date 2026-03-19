@@ -11,6 +11,7 @@ use Miraheze\CreateWiki\Hooks\CreateWikiHookRunner;
 use Miraheze\CreateWiki\Jobs\SetContainersAccessJob;
 use Miraheze\CreateWiki\Services\CreateWikiDatabaseUtils;
 use Miraheze\CreateWiki\Services\CreateWikiDataStore;
+use Miraheze\CreateWiki\Services\DeploymentGroupManager;
 use UnexpectedValueException;
 use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\Rdbms\Platform\ISQLPlatform;
@@ -45,6 +46,7 @@ class RemoteWiki {
 	private string $language;
 	private string $dbcluster;
 	private string $category;
+	private string $deploymentGroup;
 	private string $creation;
 	private ?string $url;
 
@@ -69,6 +71,7 @@ class RemoteWiki {
 	public function __construct(
 		private readonly CreateWikiDatabaseUtils $databaseUtils,
 		private readonly CreateWikiDataStore $dataStore,
+		private readonly DeploymentGroupManager $deploymentGroupManager,
 		private readonly CreateWikiHookRunner $hookRunner,
 		private readonly JobQueueGroupFactory $jobQueueGroupFactory,
 		protected readonly ServiceOptions $options,
@@ -94,6 +97,7 @@ class RemoteWiki {
 		$this->url = $row->wiki_url;
 		$this->dbcluster = $row->wiki_dbcluster ?? 'c1';
 		$this->category = $row->wiki_category;
+		$this->deploymentGroup = $this->deploymentGroupManager->resolveWikiGroup( $row->wiki_deployment_group );
 
 		$this->deleted = (bool)$row->wiki_deleted;
 		$this->locked = (bool)$row->wiki_locked;
@@ -336,6 +340,21 @@ class RemoteWiki {
 		$this->trackChange( 'category', $this->category, $category );
 		$this->category = $category;
 		$this->newRows['wiki_category'] = $category;
+	}
+
+	public function getDeploymentGroup(): string {
+		return $this->deploymentGroup;
+	}
+
+	public function getDeploymentGroupOptions(): array {
+		return $this->deploymentGroupManager->getGroups();
+	}
+
+	public function setDeploymentGroup( string $groupName ): void {
+		$resolvedGroup = $this->deploymentGroupManager->resolveWikiGroup( $groupName );
+		$this->trackChange( 'deployment-group', $this->deploymentGroup, $resolvedGroup );
+		$this->deploymentGroup = $resolvedGroup;
+		$this->newRows['wiki_deployment_group'] = $resolvedGroup;
 	}
 
 	public function getServerName(): string {

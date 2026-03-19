@@ -31,6 +31,10 @@ class ConfigNames {
 
 	public const DatabaseSuffix = 'CreateWikiDatabaseSuffix';
 
+	public const DeploymentGroupsDefaultDeployment = 'CreateWikiDeploymentGroupsDefaultDeployment';
+
+	public const DeploymentGroupsDefaultGroup = 'CreateWikiDeploymentGroupsDefaultGroup';
+
 	public const DisallowedSubdomains = 'CreateWikiDisallowedSubdomains';
 
 	public const EmailNotifications = 'CreateWikiEmailNotifications';

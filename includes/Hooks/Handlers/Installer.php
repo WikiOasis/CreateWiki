@@ -46,6 +46,14 @@ class Installer implements LoadExtensionSchemaUpdatesHook {
 		] );
 
 		$updater->addExtensionUpdateOnVirtualDomain( [
+			'virtual-createwiki',
+			'addTable',
+			'cw_deployment_groups',
+			"$dir/cw_deployment_groups.sql",
+			true,
+		] );
+
+		$updater->addExtensionUpdateOnVirtualDomain( [
 			'virtual-createwiki-central',
 			'addField',
 			'cw_requests',
@@ -69,6 +77,15 @@ class Installer implements LoadExtensionSchemaUpdatesHook {
 			'cw_wikis',
 			'wiki_extra',
 			"$dir/patches/patch-cw_wikis-add-wiki_extra.sql",
+			true,
+		] );
+
+		$updater->addExtensionUpdateOnVirtualDomain( [
+			'virtual-createwiki',
+			'addField',
+			'cw_wikis',
+			'wiki_deployment_group',
+			"$dir/patches/patch-cw_wikis-add-wiki_deployment_group.sql",
 			true,
 		] );
 

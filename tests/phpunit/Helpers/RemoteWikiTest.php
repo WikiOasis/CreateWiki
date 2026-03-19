@@ -9,6 +9,7 @@ use Miraheze\CreateWiki\ConfigNames;
 use Miraheze\CreateWiki\Exceptions\MissingWikiError;
 use Miraheze\CreateWiki\Helpers\RemoteWiki;
 use Miraheze\CreateWiki\Services\CreateWikiDatabaseUtils;
+use Miraheze\CreateWiki\Services\DeploymentGroupManager;
 use Miraheze\CreateWiki\Services\RemoteWikiFactory;
 use Miraheze\CreateWiki\Services\WikiManagerFactory;
 use Wikimedia\TestingAccessWrapper;
@@ -27,6 +28,8 @@ class RemoteWikiTest extends MediaWikiIntegrationTestCase {
 
 		$this->overrideConfigValues( [
 			ConfigNames::DatabaseSuffix => 'test',
+			ConfigNames::DeploymentGroupsDefaultDeployment => 'stable',
+			ConfigNames::DeploymentGroupsDefaultGroup => 'default',
 			ConfigNames::UseClosedWikis => true,
 			ConfigNames::UseExperimental => true,
 			ConfigNames::UseInactiveWikis => true,
@@ -74,6 +77,10 @@ class RemoteWikiTest extends MediaWikiIntegrationTestCase {
 
 	public function getWikiManagerFactory(): WikiManagerFactory {
 		return $this->getServiceContainer()->get( 'WikiManagerFactory' );
+	}
+
+	public function getDeploymentGroupManager(): DeploymentGroupManager {
+		return $this->getServiceContainer()->get( 'DeploymentGroupManager' );
 	}
 
 	/**
@@ -350,6 +357,29 @@ class RemoteWikiTest extends MediaWikiIntegrationTestCase {
 		$remoteWiki->commit();
 
 		$this->assertSame( 'c2', $remoteWiki->getDBCluster() );
+	}
+
+	/**
+	 * @covers ::getDeploymentGroup
+	 * @covers ::getDeploymentGroupOptions
+	 * @covers ::setDeploymentGroup
+	 * @covers ::trackChange
+	 */
+	public function testSetDeploymentGroup(): void {
+		$deploymentGroupManager = $this->getDeploymentGroupManager();
+		if ( !$deploymentGroupManager->createGroup( 'canary', 'mw-1.45-canary' ) ) {
+			$this->assertTrue( $deploymentGroupManager->setGroupDeployment( 'canary', 'mw-1.45-canary' ) );
+		}
+
+		$remoteWiki = $this->getFactoryService()->newInstance( 'remotewikitest' );
+		$this->assertSame( 'default', $remoteWiki->getDeploymentGroup() );
+		$this->assertArrayHasKey( 'canary', $remoteWiki->getDeploymentGroupOptions() );
+
+		$remoteWiki->setDeploymentGroup( 'canary' );
+		$remoteWiki->commit();
+
+		$remoteWiki = $this->getFactoryService()->newInstance( 'remotewikitest' );
+		$this->assertSame( 'canary', $remoteWiki->getDeploymentGroup() );
 	}
 
 	/**

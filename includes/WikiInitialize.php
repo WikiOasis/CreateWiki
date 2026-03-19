@@ -41,6 +41,8 @@ class WikiInitialize {
 	public string $hostname;
 	public string $server;
 	public string $sitename;
+	public string $deploymentGroup = 'default';
+	public string $deploymentVersion = 'stable';
 
 	public array $wikiDBClusters = [];
 	public array $disabledExtensions = [];
@@ -96,11 +98,15 @@ class WikiInitialize {
 		// Assign all known wikis
 		// @phan-suppress-next-line PhanPartialTypeMismatchProperty
 		$this->config->wikis = array_keys( $databasesArray['databases'] );
+		$defaultDeploymentGroup = (string)( $databasesArray['defaultDeploymentGroup'] ?? 'default' );
+		$defaultDeploymentVersion = (string)( $databasesArray['defaultDeploymentId'] ?? 'stable' );
 
 		// Handle wgServer and wgSitename
 		$suffixMatch = array_flip( $siteMatch );
 		$this->config->settings['wgServer']['default'] = 'https://' . $suffixMatch[ array_key_first( $suffixMatch ) ];
 		$this->config->settings['wgSitename']['default'] = 'No sitename set.';
+		$this->config->settings['cwDeploymentGroup']['default'] = $defaultDeploymentGroup;
+		$this->config->settings['cwDeploymentVersion']['default'] = $defaultDeploymentVersion;
 
 		foreach ( $databasesArray['databases'] as $db => $data ) {
 			foreach ( $suffixes as $suffix ) {
@@ -113,6 +119,13 @@ class WikiInitialize {
 
 			$this->config->settings['wgSitename'][$db] = $data['s'];
 			$this->wikiDBClusters[$db] = $data['c'];
+			if ( isset( $data['g'] ) ) {
+				$this->config->settings['cwDeploymentGroup'][$db] = $data['g'];
+			}
+
+			if ( isset( $data['v'] ) ) {
+				$this->config->settings['cwDeploymentVersion'][$db] = $data['v'];
+			}
 		}
 
 		foreach ( $deletedDatabases['databases'] as $db => $data ) {
@@ -165,6 +178,10 @@ class WikiInitialize {
 			$this->config->settings['wgServer']['default'] );
 		$this->sitename = (string)( $this->config->settings['wgSitename'][$this->dbname] ??
 			$this->config->settings['wgSitename']['default'] );
+		$this->deploymentGroup = (string)( $this->config->settings['cwDeploymentGroup'][$this->dbname] ??
+			$this->config->settings['cwDeploymentGroup']['default'] );
+		$this->deploymentVersion = (string)( $this->config->settings['cwDeploymentVersion'][$this->dbname] ??
+			$this->config->settings['cwDeploymentVersion']['default'] );
 
 		if ( !in_array( $this->dbname, $this->config->wikis, true ) ) {
 			$this->missing = true;

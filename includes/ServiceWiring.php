@@ -14,6 +14,7 @@ use Miraheze\CreateWiki\Services\CreateWikiDataStore;
 use Miraheze\CreateWiki\Services\CreateWikiNotificationsManager;
 use Miraheze\CreateWiki\Services\CreateWikiRestUtils;
 use Miraheze\CreateWiki\Services\CreateWikiValidator;
+use Miraheze\CreateWiki\Services\DeploymentGroupManager;
 use Miraheze\CreateWiki\Services\RemoteWikiFactory;
 use Miraheze\CreateWiki\Services\WikiManagerFactory;
 use Miraheze\CreateWiki\Services\WikiRequestManager;
@@ -35,9 +36,19 @@ return [
 		return new CreateWikiDataStore(
 			$services->getObjectCacheFactory(),
 			$services->get( 'CreateWikiDatabaseUtils' ),
+			$services->get( 'DeploymentGroupManager' ),
 			$services->get( 'CreateWikiHookRunner' ),
 			new ServiceOptions(
 				CreateWikiDataStore::CONSTRUCTOR_OPTIONS,
+				$services->get( 'CreateWikiConfig' )
+			)
+		);
+	},
+	'DeploymentGroupManager' => static function ( MediaWikiServices $services ): DeploymentGroupManager {
+		return new DeploymentGroupManager(
+			$services->get( 'CreateWikiDatabaseUtils' ),
+			new ServiceOptions(
+				DeploymentGroupManager::CONSTRUCTOR_OPTIONS,
 				$services->get( 'CreateWikiConfig' )
 			)
 		);
@@ -83,6 +94,7 @@ return [
 		return new RemoteWikiFactory(
 			$services->get( 'CreateWikiDatabaseUtils' ),
 			$services->get( 'CreateWikiDataStore' ),
+			$services->get( 'DeploymentGroupManager' ),
 			$services->get( 'CreateWikiHookRunner' ),
 			$services->getJobQueueGroupFactory(),
 			new ServiceOptions(
@@ -95,6 +107,7 @@ return [
 		return new WikiManagerFactory(
 			$services->get( 'CreateWikiDatabaseUtils' ),
 			$services->get( 'CreateWikiDataStore' ),
+			$services->get( 'DeploymentGroupManager' ),
 			$services->get( 'CreateWikiHookRunner' ),
 			$services->get( 'CreateWikiNotificationsManager' ),
 			$services->get( 'CreateWikiValidator' ),

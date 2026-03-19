@@ -16,9 +16,11 @@ CREATE TABLE /*_*/cw_wikis (
   wiki_locked TINYINT NOT NULL DEFAULT '0',
   wiki_dbcluster VARCHAR(5) DEFAULT 'c1',
   wiki_category VARCHAR(64) NOT NULL,
+  wiki_deployment_group VARCHAR(64) NOT NULL DEFAULT 'default',
   wiki_experimental TINYINT NOT NULL DEFAULT '0',
   wiki_extra JSON NULL
 ) /*$wgDBTableOptions*/;
 
 CREATE INDEX /*i*/wiki_dbname ON /*_*/cw_wikis (wiki_dbname);
 CREATE INDEX /*i*/wiki_dbcluster ON /*_*/cw_wikis (wiki_dbcluster);
+CREATE INDEX /*i*/wiki_deployment_group ON /*_*/cw_wikis (wiki_deployment_group);
