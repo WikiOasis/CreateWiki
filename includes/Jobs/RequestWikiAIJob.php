@@ -10,11 +10,16 @@ use MediaWiki\User\User;
 use Miraheze\CreateWiki\ConfigNames;
 use Miraheze\CreateWiki\Services\WikiRequestManager;
 use Psr\Log\LoggerInterface;
+use Sentry\SentrySdk;
+use Sentry\Tracing\SpanContext;
+use Sentry\Tracing\SpanStatus;
+use Sentry\Tracing\TransactionContext;
 use Wikimedia\Stats\StatsFactory;
 use function htmlspecialchars;
 use function implode;
 use function json_decode;
 use function json_encode;
+use function Sentry\startTransaction;
 use function sprintf;
 use function str_replace;
 use function substr;
@@ -54,9 +59,11 @@ class RequestWikiAIJob extends Job {
 
 		$this->wikiRequestManager->loadFromId( $this->id );
 
-		$decision = $this->queryOpenAI( $apiKey, $this->config->get( ConfigNames::DeferredSubjects ) );
+		$sentry = $this->beginSentryTrace();
+		$result = $this->queryOpenAI( $apiKey, $this->config->get( ConfigNames::DeferredSubjects ) );
+		$this->endSentryTrace( $sentry, $result );
 
-		if ( $decision === null ) {
+		if ( $result === null ) {
 			$this->logger->error(
 				'CreateWiki AI: Failed to get a valid response from OpenAI for request {id}.',
 				[ 'id' => $this->id ]
@@ -68,8 +75,8 @@ class RequestWikiAIJob extends Job {
 			return true;
 		}
 
-		$action = $decision['action'] ?? 'defer';
-		$comment = $decision['comment'] ?? '';
+		$action = $result['decision']['action'] ?? 'defer';
+		$comment = $result['decision']['comment'] ?? '';
 
 		$this->logger->debug(
 			'AI decision for wiki request {id}: {action}',
@@ -111,6 +118,54 @@ class RequestWikiAIJob extends Job {
 			->increment();
 
 		return true;
+	}
+
+	private function beginSentryTrace(): ?array {
+		if ( !$this->config->get( ConfigNames::EnableSentry ) || !class_exists( SentrySdk::class ) ) {
+			return null;
+		}
+
+		$txContext = new TransactionContext();
+		$txContext->setName( 'RequestWikiAIJob' );
+		$txContext->setOp( 'queue.process' );
+		$txContext->setSampled( true );
+		$transaction = startTransaction( $txContext );
+		SentrySdk::getCurrentHub()->setSpan( $transaction );
+
+		$spanContext = new SpanContext();
+		$spanContext->setOp( 'gen_ai.invoke_agent' );
+		$spanContext->setDescription( 'wiki_request_review' );
+		$span = $transaction->startChild( $spanContext );
+		$span->setData( [
+			'gen_ai.system' => 'openai',
+			'gen_ai.operation.name' => 'chat',
+			'gen_ai.request.model' => $this->config->get( ConfigNames::OpenAIConfig )['model'] ?? 'gpt-5.4-mini',
+		] );
+
+		return [ 'transaction' => $transaction, 'span' => $span ];
+	}
+
+	private function endSentryTrace( ?array $sentry, ?array $result ): void {
+		if ( $sentry === null ) {
+			return;
+		}
+
+		$span = $sentry['span'];
+		$transaction = $sentry['transaction'];
+
+		if ( $result !== null ) {
+			$usage = $result['usage'] ?? [];
+			$span->setData( [
+				'gen_ai.usage.input_tokens' => $usage['input_tokens'] ?? 0,
+				'gen_ai.usage.output_tokens' => $usage['output_tokens'] ?? 0,
+			] );
+			$span->setStatus( SpanStatus::ok() );
+		} else {
+			$span->setStatus( SpanStatus::internalError() );
+		}
+
+		$span->finish();
+		$transaction->finish();
 	}
 
 	private function placeOnHold( string $comment ): void {
@@ -244,6 +299,9 @@ class RequestWikiAIJob extends Job {
 			return null;
 		}
 
-		return (array)json_decode( $text, true );
+		return [
+			'decision' => (array)json_decode( $text, true ),
+			'usage' => $data['usage'] ?? [],
+		];
 	}
 }

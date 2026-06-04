@@ -19,6 +19,8 @@ class ConfigNames {
 
 	public const DeferredSubjects = 'CreateWikiDeferredSubjects';
 
+	public const EnableSentry = 'CreateWikiEnableSentry';
+
 	public const CacheDirectory = 'CreateWikiCacheDirectory';
 
 	public const CacheType = 'CreateWikiCacheType';
