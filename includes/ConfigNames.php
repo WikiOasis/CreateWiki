@@ -11,6 +11,8 @@ class ConfigNames {
 
 	public const AIEnabled = 'CreateWikiAIEnabled';
 
+	public const AISystemPrompt = 'CreateWikiAISystemPrompt';
+
 	public const AIThreshold = 'CreateWikiAIThreshold';
 
 	public const AutoApprovalFilter = 'CreateWikiAutoApprovalFilter';

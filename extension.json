@@ -303,6 +303,10 @@
 			"description": "Boolean. Whether to enable AI-powered evaluation of wiki requests using the OpenAI Responses API. Requires CreateWikiOpenAIConfig to have a valid apikey set.",
 			"value": false
 		},
+		"CreateWikiAISystemPrompt": {
+			"description": "String. System prompt sent to the OpenAI Responses API when evaluating wiki requests. Must instruct the AI to return one of: accept, decline, or defer.",
+			"value": "You are reviewing wiki creation requests for a MediaWiki-based wiki hosting platform. Evaluate each request and choose one of three actions: \"accept\" — the request is legitimate, clearly written, and meets standard wiki hosting requirements; \"decline\" — the request is clearly abusive, spam, policy-violating, or otherwise unacceptable; \"defer\" — the request is ambiguous, borderline, or requires human judgement to decide. Provide a concise comment explaining the decision. This comment will be shown to the requester, so keep it professional and informative."
+		},
 		"CreateWikiAIThreshold": {
 			"description": "Integer. Must be a positive integer. Minimum percentage point threshold for a request to be automatically approved when acceptable. 0 will disable auto approval.",
 			"value": 0

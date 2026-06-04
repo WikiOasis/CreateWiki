@@ -142,14 +142,7 @@ class RequestWikiAIJob extends Job {
 			htmlspecialchars( $reason, ENT_QUOTES )
 		);
 
-		$systemPrompt =
-			'You are reviewing wiki creation requests for a MediaWiki-based wiki hosting platform. ' .
-			'Evaluate each request and choose one of three actions: ' .
-			'"accept" — the request is legitimate, clearly written, and meets standard wiki hosting requirements; ' .
-			'"decline" — the request is clearly abusive, spam, policy-violating, or otherwise unacceptable; ' .
-			'"defer" — the request is ambiguous, borderline, or requires human judgement to decide. ' .
-			'Provide a concise comment explaining the decision. ' .
-			'This comment will be shown to the requester, so keep it professional and informative.';
+		$systemPrompt = $this->config->get( ConfigNames::AISystemPrompt );
 
 		if ( $deferredSubjects ) {
 			$systemPrompt .= ' Always choose "defer" for requests related to any of the following subjects: ' .
