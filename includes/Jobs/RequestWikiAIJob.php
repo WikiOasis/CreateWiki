@@ -15,10 +15,8 @@ use function htmlspecialchars;
 use function implode;
 use function json_decode;
 use function json_encode;
-use function preg_match;
 use function sprintf;
 use function str_replace;
-use function strtolower;
 use function substr;
 use function trim;
 use const ENT_QUOTES;
@@ -56,19 +54,7 @@ class RequestWikiAIJob extends Job {
 
 		$this->wikiRequestManager->loadFromId( $this->id );
 
-		if ( $this->matchesDeferredSubject() ) {
-			$this->logger->debug(
-				'Wiki request {id} matched a deferred subject; placing on hold for manual review.',
-				[ 'id' => $this->id ]
-			);
-			$this->placeOnHold( 'This request has been placed on hold for manual review due to its subject matter.' );
-			$this->statsFactory->getCounter( 'createwiki_ai_outcome_total' )
-				->setLabel( 'outcome', 'deferred-subject' )
-				->increment();
-			return true;
-		}
-
-		$decision = $this->queryOpenAI( $apiKey );
+		$decision = $this->queryOpenAI( $apiKey, $this->config->get( ConfigNames::DeferredSubjects ) );
 
 		if ( $decision === null ) {
 			$this->logger->error(
@@ -127,27 +113,6 @@ class RequestWikiAIJob extends Job {
 		return true;
 	}
 
-	private function matchesDeferredSubject(): bool {
-		$deferredSubjects = $this->config->get( ConfigNames::DeferredSubjects );
-		if ( !$deferredSubjects ) {
-			return false;
-		}
-
-		$checkText = strtolower( implode( ' ', [
-			$this->wikiRequestManager->getSitename(),
-			$this->wikiRequestManager->getCategory(),
-			$this->wikiRequestManager->getReason(),
-		] ) );
-
-		foreach ( $deferredSubjects as $pattern ) {
-			if ( preg_match( '/' . $pattern . '/i', $checkText ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
 	private function placeOnHold( string $comment ): void {
 		$this->wikiRequestManager->startQueryBuilder();
 		$this->wikiRequestManager->onhold(
@@ -157,7 +122,7 @@ class RequestWikiAIJob extends Job {
 		$this->wikiRequestManager->tryExecuteQueryBuilder();
 	}
 
-	private function queryOpenAI( string $apiKey ): ?array {
+	private function queryOpenAI( string $apiKey, array $deferredSubjects ): ?array {
 		$openAIConfig = $this->config->get( ConfigNames::OpenAIConfig );
 		$model = $openAIConfig['model'] ?? 'gpt-5.4-mini';
 		$reasoning = $openAIConfig['reasoning'] ?? null;
@@ -185,6 +150,11 @@ class RequestWikiAIJob extends Job {
 			'"defer" — the request is ambiguous, borderline, or requires human judgement to decide. ' .
 			'Provide a concise comment explaining the decision. ' .
 			'This comment will be shown to the requester, so keep it professional and informative.';
+
+		if ( $deferredSubjects ) {
+			$systemPrompt .= ' Always choose "defer" for requests related to any of the following subjects: ' .
+				implode( ', ', $deferredSubjects ) . '.';
+		}
 
 		$payload = [
 			'model' => $model,
@@ -239,7 +209,7 @@ class RequestWikiAIJob extends Job {
 				],
 				'body' => $body,
 			],
-			[ 'reqTimeout' => 30 ]
+			[ 'reqTimeout' => 90 ]
 		);
 
 		$this->logger->debug(
@@ -262,7 +232,16 @@ class RequestWikiAIJob extends Job {
 		}
 
 		$data = (array)json_decode( $request['body'], true );
-		$text = $data['output'][0]['content'][0]['text'] ?? null;
+
+		// Reasoning models prepend a reasoning item to output before the message.
+		// Find the message item by type rather than assuming index 0.
+		$text = null;
+		foreach ( $data['output'] ?? [] as $outputItem ) {
+			if ( ( $outputItem['type'] ?? '' ) === 'message' ) {
+				$text = $outputItem['content'][0]['text'] ?? null;
+				break;
+			}
+		}
 
 		if ( $text === null ) {
 			$this->logger->error(
