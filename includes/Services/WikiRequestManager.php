@@ -48,9 +48,10 @@ use function trim;
 class WikiRequestManager {
 
 	public const CONSTRUCTOR_OPTIONS = [
-		ConfigNames::AIThreshold,
+		ConfigNames::AIEnabled,
 		ConfigNames::Categories,
 		ConfigNames::DatabaseSuffix,
+		ConfigNames::DeferredSubjects,
 		ConfigNames::OpenAIConfig,
 		ConfigNames::Purposes,
 		ConfigNames::Subdomain,
@@ -158,8 +159,8 @@ class WikiRequestManager {
 
 		$this->id = $this->dbw->insertId();
 
-		if ( $this->options->get( ConfigNames::AIThreshold ) > 0 ) {
-			$this->tryAutoCreate( $data['reason'] );
+		if ( $this->options->get( ConfigNames::AIEnabled ) ) {
+			$this->tryDispatchAIReview();
 		} elseif (
 			$this->options->get( ConfigNames::OpenAIConfig )['apikey'] &&
 			$this->options->get( ConfigNames::OpenAIConfig )['assistantid']
@@ -458,10 +459,6 @@ class WikiRequestManager {
 			);
 
 			$this->log( $user, 'requestapprove' );
-
-			if ( $this->options->get( ConfigNames::AIThreshold ) === 0 ) {
-				$this->tryAutoCreate( $this->getReason() );
-			}
 		} else {
 			$wikiManager = $this->wikiManagerFactory->newInstance( $this->getDBname() );
 			// This runs validateDatabaseName and if it returns a
@@ -522,10 +519,6 @@ class WikiRequestManager {
 		}
 
 		$this->log( $user, 'requestdecline' );
-
-		if ( $this->options->get( ConfigNames::AIThreshold ) === 0 ) {
-			$this->tryAutoCreate( $this->getReason() );
-		}
 	}
 
 	public function onhold( string $comment, UserIdentity $user ): void {
@@ -1048,15 +1041,16 @@ class WikiRequestManager {
 		return implode( "\n", $lines );
 	}
 
-	private function tryAutoCreate( string $reason ): void {
+	public function tryDispatchAIReview(): void {
+		if ( !$this->options->get( ConfigNames::AIEnabled ) ) {
+			return;
+		}
+
 		$jobQueueGroup = $this->jobQueueGroupFactory->makeJobQueueGroup();
 		$jobQueueGroup->push(
 			new JobSpecification(
 				RequestWikiAIJob::JOB_NAME,
-				[
-					'id' => $this->id,
-					'reason' => $reason,
-				]
+				[ 'id' => $this->id ]
 			)
 		);
 	}

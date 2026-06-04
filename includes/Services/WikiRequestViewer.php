@@ -607,6 +607,11 @@ class WikiRequestViewer {
 			}
 
 			$this->wikiRequestManager->tryExecuteQueryBuilder();
+
+			if ( $canEditReopen ) {
+				$this->wikiRequestManager->tryDispatchAIReview();
+			}
+
 			$out->addHTML( $this->getResponseMessageBox() );
 			return;
 		}

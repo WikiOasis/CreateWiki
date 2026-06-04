@@ -47,7 +47,9 @@
 			"class": "Miraheze\\CreateWiki\\Jobs\\RequestWikiAIJob",
 			"services": [
 				"CreateWikiConfig",
-				"CreateWikiHookRunner",
+				"CreateWikiLogger",
+				"HttpRequestFactory",
+				"StatsFactory",
 				"WikiRequestManager"
 			],
 			"needsPage": false
@@ -297,6 +299,10 @@
 		"remoteExtPath": "CreateWiki/modules"
 	},
 	"config": {
+		"CreateWikiAIEnabled": {
+			"description": "Boolean. Whether to enable AI-powered evaluation of wiki requests using the OpenAI Responses API. Requires CreateWikiOpenAIConfig to have a valid apikey set.",
+			"value": false
+		},
 		"CreateWikiAIThreshold": {
 			"description": "Integer. Must be a positive integer. Minimum percentage point threshold for a request to be automatically approved when acceptable. 0 will disable auto approval.",
 			"value": 0
@@ -339,6 +345,10 @@
 			"description": "Array. LBFactory clusters which CreateWiki considers active. Format: <display name> => <cluster name from LBFactory>.",
 			"value": []
 		},
+		"CreateWikiDeferredSubjects": {
+			"description": "Array. List of regex patterns matched against a request's sitename, category, and description. Any match causes the request to be placed on hold for manual review instead of being sent to the AI.",
+			"value": []
+		},
 		"CreateWikiDatabaseClustersInactive": {
 			"description": "Array. LBFactory clusters which are not considered active for wikis to be created on. Format: <display name> => <cluster name from LBFactory>.",
 			"value": []
@@ -372,11 +382,15 @@
 			"value": "root@localhost"
 		},
 		"CreateWikiOpenAIConfig": {
-			"description": "Array. OpenAI configuration array, including dry run status, Assistant ID and API Key.",
+			"description": "Array. OpenAI configuration array. 'apikey': OpenAI API key. 'model': model name used by RequestWikiAIJob (default gpt-5.4-mini). 'reasoning': reasoning config passed to the Responses API (e.g. {\"effort\": \"medium\"}). 'dryrun'/'assistantid': used by RequestWikiRemoteAIJob only.",
 			"value": {
+				"apikey": null,
+				"model": "gpt-5.4-mini",
+				"reasoning": {
+					"effort": "medium"
+				},
 				"dryrun": true,
-				"assistantid": null,
-				"apikey": null
+				"assistantid": null
 			}
 		},
 		"CreateWikiPersistentModelFile": {
