@@ -59,6 +59,31 @@ class RequestWikiAIJob extends Job {
 
 		$this->wikiRequestManager->loadFromId( $this->id );
 
+		// Re-reviews are triggered when the requester comments on or updates a
+		// request the AI previously deferred or asked for more details on. Cap
+		// the number of re-reviews so that a request the AI keeps bouncing back
+		// is escalated to a human instead of being re-reviewed indefinitely.
+		$isReReview = (bool)( $this->params['rereview'] ?? false );
+		if ( $isReReview ) {
+			$maxReReviews = (int)$this->config->get( ConfigNames::AIMaxReReviews );
+			if ( $this->wikiRequestManager->getAIReReviewCount() >= $maxReReviews ) {
+				$this->logger->debug(
+					'CreateWiki AI: Request {id} reached the re-review limit and now needs human review.',
+					[ 'id' => $this->id ]
+				);
+				$this->placeOnHold(
+					'This request has been re-reviewed by AI the maximum number of times ' .
+					'and now requires manual review by a human.'
+				);
+				$this->statsFactory->getCounter( 'createwiki_ai_outcome_total' )
+					->setLabel( 'outcome', 'maxreviews' )
+					->increment();
+				return true;
+			}
+
+			$this->wikiRequestManager->incrementAIReReviewCount();
+		}
+
 		$sentry = $this->beginSentryTrace();
 		$result = $this->queryOpenAI( $apiKey, $this->config->get( ConfigNames::DeferredSubjects ) );
 		$this->endSentryTrace( $sentry, $result );
@@ -101,6 +126,15 @@ class RequestWikiAIJob extends Job {
 			case 'decline':
 				$this->wikiRequestManager->startQueryBuilder();
 				$this->wikiRequestManager->decline(
+					comment: $comment,
+					user: $systemUser
+				);
+				$this->wikiRequestManager->tryExecuteQueryBuilder();
+				break;
+
+			case 'moredetails':
+				$this->wikiRequestManager->startQueryBuilder();
+				$this->wikiRequestManager->moredetails(
 					comment: $comment,
 					user: $systemUser
 				);
@@ -225,7 +259,7 @@ class RequestWikiAIJob extends Job {
 						'properties' => [
 							'action' => [
 								'type' => 'string',
-								'enum' => [ 'accept', 'decline', 'defer' ],
+								'enum' => [ 'accept', 'decline', 'moredetails', 'defer' ],
 							],
 							'comment' => [
 								'type' => 'string',

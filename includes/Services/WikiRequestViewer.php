@@ -523,6 +523,10 @@ class WikiRequestViewer {
 					$this->wikiRequestManager->tryExecuteQueryBuilder();
 
 					$this->wikiRequestManager->log( $user, 'requestreopen' );
+
+					// The requester responded to a deferred or more-details
+					// request, so have the AI take another look at it.
+					$this->wikiRequestManager->tryDispatchAIReview( isReReview: true );
 				}
 
 				$out->addHTML( Html::successBox( $this->context->msg( 'createwiki-comment-success' )->escaped() ) );
@@ -609,7 +613,7 @@ class WikiRequestViewer {
 			$this->wikiRequestManager->tryExecuteQueryBuilder();
 
 			if ( $canEditReopen ) {
-				$this->wikiRequestManager->tryDispatchAIReview();
+				$this->wikiRequestManager->tryDispatchAIReview( isReReview: true );
 			}
 
 			$out->addHTML( $this->getResponseMessageBox() );

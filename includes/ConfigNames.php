@@ -11,6 +11,8 @@ class ConfigNames {
 
 	public const AIEnabled = 'CreateWikiAIEnabled';
 
+	public const AIMaxReReviews = 'CreateWikiAIMaxReReviews';
+
 	public const AISystemPrompt = 'CreateWikiAISystemPrompt';
 
 	public const AIThreshold = 'CreateWikiAIThreshold';

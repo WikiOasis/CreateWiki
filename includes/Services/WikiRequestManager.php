@@ -61,6 +61,7 @@ class WikiRequestManager {
 	public const REOPEN_STATUS_CONDS = [
 		'declined' => [ 'edit' ],
 		'moredetails' => [ 'comment', 'edit' ],
+		'onhold' => [ 'comment', 'edit' ],
 	];
 
 	public const VISIBILITY_PUBLIC = 0;
@@ -1041,7 +1042,7 @@ class WikiRequestManager {
 		return implode( "\n", $lines );
 	}
 
-	public function tryDispatchAIReview(): void {
+	public function tryDispatchAIReview( bool $isReReview = false ): void {
 		if ( !$this->options->get( ConfigNames::AIEnabled ) ) {
 			return;
 		}
@@ -1050,9 +1051,41 @@ class WikiRequestManager {
 		$jobQueueGroup->push(
 			new JobSpecification(
 				RequestWikiAIJob::JOB_NAME,
-				[ 'id' => $this->id ]
+				[
+					'id' => $this->id,
+					'rereview' => $isReReview,
+				]
 			)
 		);
+	}
+
+	/**
+	 * Number of times the AI has re-reviewed this request after the
+	 * requester commented on or updated it. The initial review on
+	 * request creation is not counted.
+	 */
+	public function getAIReReviewCount(): int {
+		return (int)( $this->getAllExtraData()['ai-rereviews'] ?? 0 );
+	}
+
+	public function incrementAIReReviewCount(): void {
+		$extra = $this->getAllExtraData();
+		$extra['ai-rereviews'] = $this->getAIReReviewCount() + 1;
+
+		$newExtra = json_encode( $extra );
+		if ( $newExtra === false ) {
+			throw new RuntimeException( 'Cannot set invalid JSON data to cw_extra.' );
+		}
+
+		$this->dbw->newUpdateQueryBuilder()
+			->update( 'cw_requests' )
+			->set( [ 'cw_extra' => $newExtra ] )
+			->where( [ 'cw_id' => $this->id ] )
+			->caller( __METHOD__ )
+			->execute();
+
+		// Reload so subsequent reads in this request see the new value.
+		$this->loadFromId( $this->id );
 	}
 
 	private function evaluateWithOpenAI(): void {

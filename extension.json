@@ -307,9 +307,13 @@
 			"description": "Boolean. Whether to enable Sentry AI monitoring instrumentation for wiki request AI evaluation. Requires the Sentry PHP SDK to be installed and configured.",
 			"value": false
 		},
+		"CreateWikiAIMaxReReviews": {
+			"description": "Integer. Maximum number of times the AI will re-review a request after the requester comments on or updates it. Once this limit is reached the request is placed on hold for human review instead of being re-reviewed. Set to 0 to disable AI re-reviews entirely.",
+			"value": 3
+		},
 		"CreateWikiAISystemPrompt": {
-			"description": "String. System prompt sent to the OpenAI Responses API when evaluating wiki requests. Must instruct the AI to return one of: accept, decline, or defer.",
-			"value": "You are reviewing wiki creation requests for a MediaWiki-based wiki hosting platform. Evaluate each request and choose one of three actions: \"accept\" — the request is legitimate, clearly written, and meets standard wiki hosting requirements; \"decline\" — the request is clearly abusive, spam, policy-violating, or otherwise unacceptable; \"defer\" — the request is ambiguous, borderline, or requires human judgement to decide. Provide a concise comment explaining the decision. This comment will be shown to the requester, so keep it professional and informative."
+			"description": "String. System prompt sent to the OpenAI Responses API when evaluating wiki requests. Must instruct the AI to return one of: accept, decline, moredetails, or defer.",
+			"value": "You are reviewing wiki creation requests for a MediaWiki-based wiki hosting platform. Evaluate each request and choose one of four actions: \"accept\" — the request is legitimate, clearly written, and meets standard wiki hosting requirements; \"decline\" — the request is clearly abusive, spam, policy-violating, or otherwise unacceptable; \"moredetails\" — the request is plausible but is missing information or is too vague to evaluate, and the requester should be asked to provide more details; \"defer\" — the request is ambiguous, borderline, or requires human judgement to decide. Prefer \"moredetails\" over \"defer\" when the only obstacle is insufficient information that the requester could reasonably supply. Provide a concise comment explaining the decision. This comment will be shown to the requester, so keep it professional and informative. When choosing \"moredetails\", clearly state what additional information is needed."
 		},
 		"CreateWikiAIThreshold": {
 			"description": "Integer. Must be a positive integer. Minimum percentage point threshold for a request to be automatically approved when acceptable. 0 will disable auto approval.",

@@ -90,6 +90,21 @@ class WikiRequestAddCommentHandler extends SimpleHandler {
 			notifyUsers: []
 		);
 
+		// If the requester is responding to a request the AI deferred or asked
+		// for more details on, reopen it and have the AI re-review it.
+		if (
+			$this->getAuthority()->getUser()->getId() === $requester->getId() &&
+			$this->wikiRequestManager->canCommentReopen()
+		) {
+			$this->wikiRequestManager->startQueryBuilder();
+			$this->wikiRequestManager->setStatus( 'inreview' );
+			$this->wikiRequestManager->tryExecuteQueryBuilder();
+
+			$this->wikiRequestManager->log( $this->getAuthority()->getUser(), 'requestreopen' );
+
+			$this->wikiRequestManager->tryDispatchAIReview( isReReview: true );
+		}
+
 		return $this->getResponseFactory()->createNoContent();
 	}
 
