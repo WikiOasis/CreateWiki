@@ -3,10 +3,12 @@
 namespace Miraheze\CreateWiki\Jobs;
 
 use MediaWiki\Config\Config;
+use MediaWiki\Context\RequestContext;
 use MediaWiki\Http\HttpRequestFactory;
 use MediaWiki\JobQueue\Job;
 use MediaWiki\MainConfigNames;
 use MediaWiki\User\User;
+use MessageLocalizer;
 use Miraheze\CreateWiki\ConfigNames;
 use Miraheze\CreateWiki\Services\WikiRequestManager;
 use Psr\Log\LoggerInterface;
@@ -15,6 +17,7 @@ use Sentry\Tracing\SpanContext;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 use Wikimedia\Stats\StatsFactory;
+use function array_reverse;
 use function htmlspecialchars;
 use function implode;
 use function json_decode;
@@ -31,6 +34,7 @@ class RequestWikiAIJob extends Job {
 	public const JOB_NAME = 'RequestWikiAIJob';
 
 	private readonly int $id;
+	private readonly MessageLocalizer $messageLocalizer;
 
 	public function __construct(
 		array $params,
@@ -42,6 +46,7 @@ class RequestWikiAIJob extends Job {
 	) {
 		parent::__construct( self::JOB_NAME, $params );
 		$this->id = $params['id'];
+		$this->messageLocalizer = RequestContext::getMain();
 	}
 
 	/** @inheritDoc */
@@ -85,7 +90,11 @@ class RequestWikiAIJob extends Job {
 		}
 
 		$sentry = $this->beginSentryTrace();
-		$result = $this->queryOpenAI( $apiKey, $this->config->get( ConfigNames::DeferredSubjects ) );
+		$result = $this->queryOpenAI(
+			$apiKey,
+			$this->config->get( ConfigNames::DeferredSubjects ),
+			$isReReview
+		);
 		$this->endSentryTrace( $sentry, $result );
 
 		if ( $result === null ) {
@@ -146,6 +155,18 @@ class RequestWikiAIJob extends Job {
 				$this->placeOnHold( $comment );
 				break;
 		}
+
+		// Record the decision in the request history so that, if the request
+		// is later edited and resubmitted, the next re-review has the full
+		// context of what the AI previously decided and why.
+		$this->wikiRequestManager->addRequestHistory(
+			action: 'ai-decision',
+			details: $this->messageLocalizer->msg( 'requestwiki-ai-decision-history' )
+				->params( $action, $comment )
+				->inContentLanguage()
+				->parse(),
+			user: $systemUser
+		);
 
 		$this->statsFactory->getCounter( 'createwiki_ai_outcome_total' )
 			->setLabel( 'outcome', $action )
@@ -211,7 +232,34 @@ class RequestWikiAIJob extends Job {
 		$this->wikiRequestManager->tryExecuteQueryBuilder();
 	}
 
-	private function queryOpenAI( string $apiKey, array $deferredSubjects ): ?array {
+	/**
+	 * Build a plain-text summary of the request's change history and prior AI
+	 * decisions, oldest first, for inclusion in the re-review prompt.
+	 */
+	private function buildHistoryContext(): string {
+		$history = $this->wikiRequestManager->getRequestHistory();
+		if ( !$history ) {
+			return '';
+		}
+
+		// getRequestHistory() returns the newest entry first; present the
+		// timeline chronologically so the model reads it in order.
+		$entries = [];
+		foreach ( array_reverse( $history ) as $entry ) {
+			$details = trim( str_replace( [ "\r\n", "\r" ], "\n", $entry['details'] ) );
+			$entries[] = sprintf(
+				'[%s] %s by %s: %s',
+				$entry['timestamp'],
+				$entry['action'],
+				$entry['user']->getName(),
+				$details
+			);
+		}
+
+		return implode( "\n", $entries );
+	}
+
+	private function queryOpenAI( string $apiKey, array $deferredSubjects, bool $isReReview ): ?array {
 		$openAIConfig = $this->config->get( ConfigNames::OpenAIConfig );
 		$model = $openAIConfig['model'] ?? 'gpt-5.4-mini';
 		$reasoning = $openAIConfig['reasoning'] ?? null;
@@ -230,6 +278,19 @@ class RequestWikiAIJob extends Job {
 			$this->wikiRequestManager->isBio() ? 'Yes' : 'No',
 			htmlspecialchars( $reason, ENT_QUOTES )
 		);
+
+		// On a re-review the request has been edited and resubmitted (or the
+		// requester responded to a deferred/more-details request). Give the
+		// model the history of changes and prior AI decisions so it can take
+		// the requester's response into account instead of reviewing blind.
+		if ( $isReReview ) {
+			$history = $this->buildHistoryContext();
+			if ( $history !== '' ) {
+				$prompt .= "\n\nThis request has been edited and resubmitted for re-review. " .
+					"The following is the history of changes to the request and any previous AI " .
+					"decisions, oldest first:\n" . $history;
+			}
+		}
 
 		$systemPrompt = $this->config->get( ConfigNames::AISystemPrompt );
 
