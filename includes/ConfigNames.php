@@ -9,9 +9,19 @@ namespace Miraheze\CreateWiki;
  */
 class ConfigNames {
 
+	public const AIEnabled = 'CreateWikiAIEnabled';
+
+	public const AIMaxReReviews = 'CreateWikiAIMaxReReviews';
+
+	public const AISystemPrompt = 'CreateWikiAISystemPrompt';
+
 	public const AIThreshold = 'CreateWikiAIThreshold';
 
 	public const AutoApprovalFilter = 'CreateWikiAutoApprovalFilter';
+
+	public const DeferredSubjects = 'CreateWikiDeferredSubjects';
+
+	public const EnableSentry = 'CreateWikiEnableSentry';
 
 	public const CacheDirectory = 'CreateWikiCacheDirectory';
 

@@ -291,10 +291,12 @@ class WikiRequestViewer {
 		if ( $canHandleRequest ) {
 			foreach ( $this->wikiRequestManager->getRequestHistory() as $entry ) {
 				$timestamp = $this->context->getLanguage()->userTimeAndDate( $entry['timestamp'], $user );
+				$actionMsg = $this->context->msg( 'requestwiki-history-action-' . $entry['action'] );
+				$actionLabel = $actionMsg->exists() ? $actionMsg->text() : ucfirst( $entry['action'] );
 				$formDescriptor[ 'history-' . $entry['timestamp'] ] = [
 					'type' => 'info',
 					'section' => 'history',
-					'label' => $entry['user']->getName() . ' | ' . ucfirst( $entry['action'] ) . ' | ' . $timestamp,
+					'label' => $entry['user']->getName() . ' | ' . $actionLabel . ' | ' . $timestamp,
 					'default' => ( new RawMessage( nl2br( $entry['details'] ) ) )->parse(),
 					'raw' => true,
 				];
@@ -540,6 +542,9 @@ class WikiRequestViewer {
 							notifyUsers: []
 						);
 					}
+					// The requester responded to a deferred or more-details
+					// request, so have the AI take another look at it.
+					$this->wikiRequestManager->tryDispatchAIReview( isReReview: true );
 				}
 
 				$out->addHTML( Html::successBox( $this->context->msg( 'createwiki-comment-success' )->escaped() ) );
@@ -639,6 +644,11 @@ class WikiRequestViewer {
 			}
 
 			$this->wikiRequestManager->tryExecuteQueryBuilder();
+
+			if ( $canEditReopen ) {
+				$this->wikiRequestManager->tryDispatchAIReview( isReReview: true );
+			}
+
 			$out->addHTML( $this->getResponseMessageBox() );
 			return;
 		}

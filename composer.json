@@ -24,7 +24,8 @@
 	},
 	"require": {
 		"composer/installers": ">=1.0.1",
-		"php-ai/php-ml": "*"
+		"php-ai/php-ml": "*",
+		"sentry/sentry": "^4.0"
 	},
 	"require-dev": {
 		"mediawiki/mediawiki-codesniffer": "51.0.0",

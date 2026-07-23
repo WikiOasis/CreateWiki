@@ -48,9 +48,10 @@ use function trim;
 class WikiRequestManager {
 
 	public const CONSTRUCTOR_OPTIONS = [
-		ConfigNames::AIThreshold,
+		ConfigNames::AIEnabled,
 		ConfigNames::Categories,
 		ConfigNames::DatabaseSuffix,
+		ConfigNames::DeferredSubjects,
 		ConfigNames::OpenAIConfig,
 		ConfigNames::Purposes,
 		ConfigNames::Subdomain,
@@ -60,6 +61,7 @@ class WikiRequestManager {
 	public const REOPEN_STATUS_CONDS = [
 		'declined' => [ 'edit' ],
 		'moredetails' => [ 'comment', 'edit' ],
+		'onhold' => [ 'comment', 'edit' ],
 	];
 
 	public const VISIBILITY_PUBLIC = 0;
@@ -158,8 +160,8 @@ class WikiRequestManager {
 
 		$this->id = $this->dbw->insertId();
 
-		if ( $this->options->get( ConfigNames::AIThreshold ) > 0 ) {
-			$this->tryAutoCreate( $data['reason'] );
+		if ( $this->options->get( ConfigNames::AIEnabled ) ) {
+			$this->tryDispatchAIReview();
 		} elseif (
 			$this->options->get( ConfigNames::OpenAIConfig )['apikey'] &&
 			$this->options->get( ConfigNames::OpenAIConfig )['assistantid']
@@ -458,10 +460,6 @@ class WikiRequestManager {
 			);
 
 			$this->log( $user, 'requestapprove' );
-
-			if ( $this->options->get( ConfigNames::AIThreshold ) === 0 ) {
-				$this->tryAutoCreate( $this->getReason() );
-			}
 		} else {
 			$wikiManager = $this->wikiManagerFactory->newInstance( $this->getDBname() );
 			// This runs validateDatabaseName and if it returns a
@@ -522,10 +520,6 @@ class WikiRequestManager {
 		}
 
 		$this->log( $user, 'requestdecline' );
-
-		if ( $this->options->get( ConfigNames::AIThreshold ) === 0 ) {
-			$this->tryAutoCreate( $this->getReason() );
-		}
 	}
 
 	public function onhold( string $comment, UserIdentity $user ): void {
@@ -1048,17 +1042,50 @@ class WikiRequestManager {
 		return implode( "\n", $lines );
 	}
 
-	private function tryAutoCreate( string $reason ): void {
+	public function tryDispatchAIReview( bool $isReReview = false ): void {
+		if ( !$this->options->get( ConfigNames::AIEnabled ) ) {
+			return;
+		}
+
 		$jobQueueGroup = $this->jobQueueGroupFactory->makeJobQueueGroup();
 		$jobQueueGroup->push(
 			new JobSpecification(
 				RequestWikiAIJob::JOB_NAME,
 				[
 					'id' => $this->id,
-					'reason' => $reason,
+					'rereview' => $isReReview,
 				]
 			)
 		);
+	}
+
+	/**
+	 * Number of times the AI has re-reviewed this request after the
+	 * requester commented on or updated it. The initial review on
+	 * request creation is not counted.
+	 */
+	public function getAIReReviewCount(): int {
+		return (int)( $this->getAllExtraData()['ai-rereviews'] ?? 0 );
+	}
+
+	public function incrementAIReReviewCount(): void {
+		$extra = $this->getAllExtraData();
+		$extra['ai-rereviews'] = $this->getAIReReviewCount() + 1;
+
+		$newExtra = json_encode( $extra );
+		if ( $newExtra === false ) {
+			throw new RuntimeException( 'Cannot set invalid JSON data to cw_extra.' );
+		}
+
+		$this->dbw->newUpdateQueryBuilder()
+			->update( 'cw_requests' )
+			->set( [ 'cw_extra' => $newExtra ] )
+			->where( [ 'cw_id' => $this->id ] )
+			->caller( __METHOD__ )
+			->execute();
+
+		// Reload so subsequent reads in this request see the new value.
+		$this->loadFromId( $this->id );
 	}
 
 	private function evaluateWithOpenAI(): void {
