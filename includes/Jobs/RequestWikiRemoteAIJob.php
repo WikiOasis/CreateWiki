@@ -13,6 +13,7 @@ use MediaWiki\Permissions\UltimateAuthority;
 use MediaWiki\User\User;
 use Miraheze\CreateWiki\ConfigNames;
 use Miraheze\CreateWiki\CreateWikiRegexConstraint;
+use Miraheze\CreateWiki\Helpers\AIAgentTracer;
 use Miraheze\CreateWiki\Services\WikiRequestManager;
 use Psr\Log\LoggerInterface;
 use Wikimedia\Stats\StatsFactory;
@@ -329,6 +330,8 @@ class RequestWikiRemoteAIJob extends Job {
 		string $username,
 		int $userRequestsNum
 	): ?array {
+		$tracer = new AIAgentTracer( $this->id );
+
 		try {
 			$isBio = $bio ? 'Yes' : 'No';
 			$isNsfw = !empty( $extraData['nsfw'] ) ? 'Yes' : 'No';
@@ -368,16 +371,29 @@ class RequestWikiRemoteAIJob extends Job {
 				$claudeConfig['fallbackmodels'] ?? []
 			) ) );
 
+			$tracer->startAgent(
+				$this->buildSystemPrompt( $claudeConfig ),
+				$sanitizedReason,
+				$this->buildTools( $models[0], $claudeConfig )
+			);
+
 			foreach ( $models as $model ) {
-				$result = $this->runReview( $model, $claudeConfig, $sanitizedReason );
+				$result = $this->runReview( $model, $claudeConfig, $sanitizedReason, $tracer );
 				if ( $result !== false ) {
+					$tracer->finishAgent(
+						$result['recommendation'] ?? null,
+						$model,
+						$result === null ? $this->getLastError() : null
+					);
 					return $result;
 				}
 			}
 
 			$this->setLastError( 'Run ' . $this->id . ' failed. Every configured model declined the request.' );
+			$tracer->finishAgent( null, null, 'Every configured model declined to review this request.' );
 			return [ 'error' => 'Every configured model declined to review this request.' ];
 		} catch ( Exception $e ) {
+			$tracer->finishAgent( null, null, $e->getMessage() );
 			$this->logger->error( 'HTTP request failed: ' . $e->getMessage() );
 			$this->setLastError( 'An exception occured! The following issue was reported: ' . $e->getMessage() );
 			return null;
@@ -390,7 +406,8 @@ class RequestWikiRemoteAIJob extends Job {
 	private function runReview(
 		string $model,
 		array $claudeConfig,
-		string $sanitizedReason
+		string $sanitizedReason,
+		AIAgentTracer $tracer
 	): array|false|null {
 		$body = [
 			'model' => $model,
@@ -403,13 +420,20 @@ class RequestWikiRemoteAIJob extends Job {
 		];
 
 		if ( !in_array( $model, self::BASIC_TOOL_MODELS, true ) ) {
+			// Summarised thinking is returned so it can be reviewed in Sentry
+			$body['thinking'] = [
+				'type' => 'adaptive',
+				'display' => 'summarized',
+			];
 			$body['output_config'] = [
 				'effort' => $claudeConfig['effort'] ?? 'medium',
 			];
 		}
 
 		for ( $turn = 0; $turn < self::MAX_TURNS; $turn++ ) {
+			$chatSpan = $tracer->startChat( $body );
 			$responseData = $this->createRequest( $body );
+			$tracer->finishChat( $chatSpan, $responseData );
 
 			$this->logger->debug(
 				'Claude ({model}) returned the following data for AI decision of {id}: {responseData}',

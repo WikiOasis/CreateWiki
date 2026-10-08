@@ -8,6 +8,7 @@ $cfg['directory_list'] = array_merge(
 		'../../extensions/ManageWiki',
 		'../../tests',
 		'tests',
+		'vendor/sentry/sentry/src',
 	]
 );
 
@@ -16,6 +17,7 @@ $cfg['exclude_analysis_directory_list'] = array_merge(
 		'../../extensions/Echo',
 		'../../extensions/ManageWiki',
 		'../../tests',
+		'vendor/sentry/sentry/src',
 	]
 );
 
