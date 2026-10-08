@@ -324,6 +324,25 @@
 			"description": "Array. An array of categories used for wiki categorization. If this is an empty array, categories will not be used at all.",
 			"value": []
 		},
+		"CreateWikiClaudeConfig": {
+			"description": "Array. Configuration for the Claude API",
+			"value": {
+				"dryrun": true,
+				"model": "claude-sonnet-5-5",
+				"effort": "medium",
+				"instructions": null,
+				"apikey": null,
+				"websearch": true,
+				"webfetch": true,
+				"maxwebuses": 5,
+				"fetchalloweddomains": [],
+				"fallbackmodels": [
+					"claude-opus-5-5",
+					"claude-haiku-5-5",
+					"claude-fable-5-1"
+				]
+			}
+		},
 		"CreateWikiClosedReasons": {
 			"description": "Array. Possible options for the reason a wiki was closed.",
 			"value": []
@@ -381,15 +400,6 @@
 		"CreateWikiNotificationEmail": {
 			"description": "String. Email address to send internally generated notification emails to. Does not depend on $wgCreateWikiEmailNotifications.",
 			"value": "root@localhost"
-		},
-		"CreateWikiOpenAIConfig": {
-			"description": "Array. OpenAI configuration array, including dry run status, model, instructions and API Key.",
-			"value": {
-				"dryrun": true,
-				"model": null,
-				"instructions": null,
-				"apikey": null
-			}
 		},
 		"CreateWikiPersistentModelFile": {
 			"description": "String. Location to a file that can be overwritten to contain a persistent machine learning model.",

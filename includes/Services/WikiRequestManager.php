@@ -50,8 +50,8 @@ class WikiRequestManager {
 	public const CONSTRUCTOR_OPTIONS = [
 		ConfigNames::AIThreshold,
 		ConfigNames::Categories,
+		ConfigNames::ClaudeConfig,
 		ConfigNames::DatabaseSuffix,
-		ConfigNames::OpenAIConfig,
 		ConfigNames::Purposes,
 		ConfigNames::Subdomain,
 		ConfigNames::UseJobQueue,
@@ -161,10 +161,10 @@ class WikiRequestManager {
 		if ( $this->options->get( ConfigNames::AIThreshold ) > 0 ) {
 			$this->tryAutoCreate( $data['reason'] );
 		} elseif (
-			$this->options->get( ConfigNames::OpenAIConfig )['apikey'] &&
-			$this->options->get( ConfigNames::OpenAIConfig )['model']
+			$this->options->get( ConfigNames::ClaudeConfig )['apikey'] &&
+			$this->options->get( ConfigNames::ClaudeConfig )['model']
 		) {
-			$this->evaluateWithOpenAI();
+			$this->evaluateWithClaude();
 		}
 
 		$this->logNewRequest( $data, $user );
@@ -1062,7 +1062,7 @@ class WikiRequestManager {
 		);
 	}
 
-	private function evaluateWithOpenAI(): void {
+	private function evaluateWithClaude(): void {
 		$jobQueueGroup = $this->jobQueueGroupFactory->makeJobQueueGroup();
 		$jobQueueGroup->push(
 			new JobSpecification(

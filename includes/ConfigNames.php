@@ -21,6 +21,8 @@ class ConfigNames {
 
 	public const Categories = 'CreateWikiCategories';
 
+	public const ClaudeConfig = 'CreateWikiClaudeConfig';
+
 	public const ClosedReasonOptions = 'CreateWikiClosedReasons';
 
 	public const Collation = 'CreateWikiCollation';
@@ -46,8 +48,6 @@ class ConfigNames {
 	public const InactiveExemptReasonOptions = 'CreateWikiInactiveExemptReasonOptions';
 
 	public const NotificationEmail = 'CreateWikiNotificationEmail';
-
-	public const OpenAIConfig = 'CreateWikiOpenAIConfig';
 
 	public const PersistentModelFile = 'CreateWikiPersistentModelFile';
 
