@@ -45,7 +45,7 @@ class RequestWikiRemoteAIJob extends Job {
 	];
 
 	/** Upper bound on API round tripping */
-	private const MAX_TURNS = 5;
+	private const MAX_TURNS = 15;
 
 	private readonly int $id;
 	private readonly MessageLocalizer $messageLocalizer;
