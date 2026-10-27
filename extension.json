@@ -105,6 +105,41 @@
 		"farmer": "farmer-log-name",
 		"farmersuppression": "farmersuppression-log-name"
 	},
+	"LogParamsAllowedClasses": {
+		"farmer/comment": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/create-failure": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/requestapprove": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/requestabandon": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/requestdecline": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/requestmoredetails": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/requestonhold": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmer/requestreopen": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmersuppression/delete": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmersuppression/public": [
+			"Wikimedia\\Message\\ScalarParam"
+		],
+		"farmersuppression/suppress": [
+			"Wikimedia\\Message\\ScalarParam"
+		]
+	},
 	"LogTypes": [
 		"farmer",
 		"farmersuppression"
