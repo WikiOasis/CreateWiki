@@ -3,6 +3,7 @@
 namespace Miraheze\CreateWiki\Hooks\Handlers;
 
 use MediaWiki\Installer\Hook\LoadExtensionSchemaUpdatesHook;
+use Miraheze\CreateWiki\Maintenance\MigrateLogParams;
 
 class Installer implements LoadExtensionSchemaUpdatesHook {
 
@@ -42,6 +43,15 @@ class Installer implements LoadExtensionSchemaUpdatesHook {
 			'addTable',
 			'cw_wikis',
 			"$dir/cw_wikis.sql",
+			true,
+		] );
+
+		$updater->addExtensionUpdateOnVirtualDomain( [
+			'virtual-createwiki-central',
+			'addField',
+			'cw_comments',
+			'cw_comment_id',
+			"$dir/patches/patch-cw_comments-add-cw_comment_id.sql",
 			true,
 		] );
 
@@ -151,5 +161,7 @@ class Installer implements LoadExtensionSchemaUpdatesHook {
 			"$dir/patches/patch-cw_wikis-drop-wiki_settings.sql",
 			true,
 		] );
+
+		$updater->addPostDatabaseUpdateMaintenance( MigrateLogParams::class );
 	}
 }
